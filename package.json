@@ -1,6 +1,6 @@
 {
   "name": "@logi.one/rest-client",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Simple rest client for JSON and stream requests for node with bearer auth support",
   "main": "index.js",
   "scripts": {
