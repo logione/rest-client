@@ -3,6 +3,7 @@
   "version": "0.1.4",
   "description": "Simple rest client for JSON and stream requests for node with bearer auth support",
   "main": "index.js",
+  "files": [ "/dist" ],
   "scripts": {
     "test": "jasmine",
     "build": "tsc",
