@@ -12,7 +12,7 @@ export async function getStream(url: string, options?: RequestOptions<undefined>
             if (!response.statusCode) {
                 reject(new Error('No status code'))
             } else if (response.statusCode < 200 || response.statusCode > 299) {
-                reject(new RequestError(response.statusMessage || '', response.statusCode))
+                reject(new RequestError(response.statusMessage || '', response.statusCode, response))
             } else {
                 resolve(response)
             }
@@ -41,7 +41,7 @@ async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStre
             if (!response.statusCode) {
                 reject(new Error('No status code'))
             } else if (response.statusCode < 200 || response.statusCode > 299) {
-                reject(new RequestError(response.statusMessage || '', response.statusCode))
+                reject(new RequestError(response.statusMessage || '', response.statusCode, response))
             } else {
                 resolve(response)
             }

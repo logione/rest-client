@@ -36,7 +36,7 @@ export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
 
     const result = await fetch(url, requestInit)
     if (!result.ok) {
-        throw new RequestError(result.statusText, result.status)
+        throw new RequestError(result.statusText, result.status, result)
     }
     return result
 }
