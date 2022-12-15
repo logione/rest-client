@@ -24,26 +24,26 @@ export async function getStream(url: string, options?: RequestOptions<undefined>
     })
 }
 
-export async function postStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<void> {
+export async function postStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
     return postOrPutStream('POST', url, readableStream, options)
 }
 
-export async function putStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<void> {
+export async function putStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
     return postOrPutStream('PUT', url, readableStream, options)
 }
 
-async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<void> {
+async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
     const { protocol, httpRequestOptions } = getHTTPRequestOptions(method, url, options)
     const request = await importHttpRequest(protocol)
     let req: ClientRequest | undefined
-    const promise = new Promise<void>((resolve, reject) => {
+    const promise = new Promise<IncomingMessage>((resolve, reject) => {
         req = request(httpRequestOptions, (response) => {
             if (!response.statusCode) {
                 reject(new Error('No status code'))
             } else if (response.statusCode < 200 || response.statusCode > 299) {
                 reject(new RequestError(response.statusMessage || '', response.statusCode))
             } else {
-                resolve()
+                resolve(response)
             }
         })
         req.on('error', (err) => {
