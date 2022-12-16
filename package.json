@@ -1,6 +1,6 @@
 {
   "name": "@logi.one/rest-client",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "This is a free, ultra-lightweight and easy to use rest client for node.js supporting JSON requests and streams with no external dependencies.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -31,9 +31,21 @@
     "jasmine": "^4.4.0"
   },
   "keywords": [
-    "http", "https", "http2", "stream", "JSON",
-    "get", "post", "put", "delete", "rest",
-    "curl", "wget", "fetch", "request", "got",
+    "http",
+    "https",
+    "http2",
+    "stream",
+    "JSON",
+    "get",
+    "post",
+    "put",
+    "delete",
+    "rest",
+    "curl",
+    "wget",
+    "fetch",
+    "request",
+    "got",
     "typescript"
   ]
 }
