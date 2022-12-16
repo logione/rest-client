@@ -1,10 +1,12 @@
 {
   "name": "@logi.one/rest-client",
   "version": "0.2.2",
-  "description": "Simple rest client for JSON and stream requests for node with bearer auth support",
+  "description": "This is a free, ultra-lightweight and easy to use rest client for node.js supporting JSON requests and streams with no external dependencies.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
+    "/dist",
+    "/README.md",
     "/LICENSE"
   ],
   "scripts": {
@@ -27,5 +29,11 @@
     "@types/node": "^18.0.0",
     "typescript": "^4.8.3",
     "jasmine": "^4.4.0"
-  }
+  },
+  "keywords": [
+    "http", "https", "http2", "stream", "JSON",
+    "get", "post", "put", "delete", "rest",
+    "curl", "wget", "fetch", "request", "got",
+    "typescript"
+  ]
 }
