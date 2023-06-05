@@ -46,9 +46,6 @@ async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStre
                 resolve(response)
             }
         })
-        req.on('error', (err) => {
-            reject(err)
-        })
     })
     await pipeline(readableStream, req!)
     return promise
