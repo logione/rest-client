@@ -55,7 +55,7 @@ describe('fetch-stream specs', () => {
         it('should get stream', async () => {
             status = 200
 
-            const response = new Readable()
+            let response = new Readable()
             response.push('beep') 
             response.push(null)
             responseBody = response
@@ -83,13 +83,24 @@ describe('fetch-stream specs', () => {
             }
             expect(error?.status).toBe(300)
         })
+
+        
+        it('should throw error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await getStream('http://localhost:65012/testputsttream')
+            } catch (err) {
+                error = err
+            }
+            expect(error.errno).toBe(-111)
+        })
     })
 
     describe('POST', () => {
         it('should post stream', async () => {
             status = 200
 
-            const stream = new Readable()
+            let stream = new Readable()
             stream.push('beep') 
             stream.push(null)
 
@@ -102,7 +113,11 @@ describe('fetch-stream specs', () => {
             expect(lastRequest!.headers['content-length']).toBeUndefined()
             expect(lastRequest!.headers['fake-header']).toBe('fake')
             expect(lastRequestBody).toBe('beep')
- 
+
+            stream = new Readable()
+            stream.push('beep') 
+            stream.push(null)
+
             await postStream('http://localhost:5001/testpoststream', stream)
             expect(lastRequest!.headers.authorization).toBeUndefined()
         })
@@ -120,13 +135,27 @@ describe('fetch-stream specs', () => {
             }
             expect(error.status).toBe(300)
         })
+
+        it('should throw error if cannot connect to server', async () => {
+            status = 300
+            let error: any
+            const stream = new Readable()
+            stream.push('beep') 
+            stream.push(null)
+            try {
+                await postStream('http://localhost:65012/testputsttream', stream)
+            } catch (err) {
+                error = err
+            }
+            expect(error.errno).toBe(-111)
+        })
     })
 
     describe('PUT', () => {
-        it('should post stream', async () => {
+        it('should put stream', async () => {
             status = 200
 
-            const stream = new Readable()
+            let stream = new Readable()
             stream.push('beep') 
             stream.push(null)
 
@@ -139,6 +168,10 @@ describe('fetch-stream specs', () => {
             expect(lastRequest!.headers['content-length']).toBeUndefined()
             expect(lastRequest!.headers['fake-header']).toBe('fake')
             expect(lastRequestBody).toBe('beep')
+
+            stream = new Readable()
+            stream.push('beep') 
+            stream.push(null)
     
             await putStream('http://localhost:5001/testputstream', stream)
             expect(lastRequest!.headers.authorization).toBeUndefined()
@@ -156,6 +189,20 @@ describe('fetch-stream specs', () => {
                 error = err
             }
             expect(error.status).toBe(300)
+        })
+
+        it('should throw error if cannot connect to server', async () => {
+            status = 300
+            let error: any
+            const stream = new Readable()
+            stream.push('beep') 
+            stream.push(null)
+            try {
+                await putStream('http://localhost:65012/testputsttream', stream)
+            } catch (err) {
+                error = err
+            }
+            expect(error.errno).toBe(-111)
         })
     })
 })

@@ -92,6 +92,16 @@ describe('fetch-json specs', () => {
             }
             expect(error?.status).toBe(500)
         })
+            
+        it('should throw an error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await postJSON<{ fake: string }>('http://localhost:65012/testpost', { body: { fake: 'Data' }})
+            } catch (err) {
+                error = err
+            }
+            expect(error.message).toBe('fetch failed')
+        })
     })
 
     describe('PUT', () => {
@@ -123,6 +133,16 @@ describe('fetch-json specs', () => {
             }
             expect(error?.status).toBe(300)
         })
+
+        it('should throw an error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await putJSON<{ fake: string }>('http://localhost:65012/testpost', { body: { fake: 'Data' }})
+            } catch (err) {
+                error = err
+            }
+            expect(error.message).toBe('fetch failed')
+        })
     })
 
     describe('GET', () => {
@@ -152,6 +172,16 @@ describe('fetch-json specs', () => {
                 error = err
             }
             expect(error?.status).toBe(300)
+        })
+
+        it('should throw an error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await getJSON<{ fake: string }>('http://localhost:65012/testget')
+            } catch (err) {
+                error = err
+            }
+            expect(error.message).toBe('fetch failed')
         })
     })
 
@@ -186,6 +216,16 @@ describe('fetch-json specs', () => {
                 error = err
             }
             expect(error?.status).toBe(300)
+        })
+
+        it('should throw an error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await deleteJSON<{ fake: string }>('http://localhost:65012/testget')
+            } catch (err) {
+                error = err
+            }
+            expect(error.message).toBe('fetch failed')
         })
     })
 })

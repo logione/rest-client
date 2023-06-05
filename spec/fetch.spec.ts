@@ -79,6 +79,16 @@ describe('fetch specs', () => {
             }
             expect(error?.status).toBe(500)
         })
+
+        it('should throw an error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await post('http://localhost:65012/testget', { body: 'Data' })
+            } catch (err) {
+                error = err
+            }
+            expect(error.message).toBe('fetch failed')
+        })
     })
 
     describe('PUT', () => {
@@ -110,6 +120,16 @@ describe('fetch specs', () => {
             }
             expect(error?.status).toBe(300)
         })
+
+        it('should throw an error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await put('http://localhost:65012/testget', { body: 'Data' })
+            } catch (err) {
+                error = err
+            }
+            expect(error.message).toBe('fetch failed')
+        })
     })
 
     describe('GET', () => {
@@ -140,6 +160,16 @@ describe('fetch specs', () => {
             }
             expect(error?.status).toBe(300)
         })
+        
+        it('should throw an error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await get('http://localhost:65012/testget')
+            } catch (err) {
+                error = err
+            }
+            expect(error.message).toBe('fetch failed')
+        })
     })
 
     describe('DELETE', () => {
@@ -169,6 +199,16 @@ describe('fetch specs', () => {
                 error = err
             }
             expect(error?.status).toBe(300)
+        })
+        
+        it('should throw an error if cannot connect to server', async () => {
+            let error: any
+            try {
+                await del('http://localhost:65012/testget')
+            } catch (err) {
+                error = err
+            }
+            expect(error.message).toBe('fetch failed')
         })
     })
 })
