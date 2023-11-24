@@ -80,6 +80,18 @@ const headers = { 'X-Custom-Header': 'value' }
 await del('https://myapi/texts/1', { token, headers })
 ```
 
+### Query parameters
+
+```javascript
+import { get } from '@logi.one/rest-client'
+
+// The requests that follow are all the same
+await get('https://myapi/texts', { query: 'page=1&sort=true&filter=noreply%40fake.ch' })
+await get('https://myapi/texts', { query: ['page=1', 'sort=true', 'filter=noreply%40fake.ch' ]})
+await get('https://myapi/texts', { query: { page: 1, sort: true, filter: 'noreply@fake.ch' }})
+await get('https://myapi/texts?page=1&limit=2&filter=noreply%40fake.ch')
+```
+
 ### Error handling
 
 ```javascript	
