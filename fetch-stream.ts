@@ -3,8 +3,12 @@ import { pipeline } from 'stream/promises'
 
 import { RequestError } from './request-error'
 import { RequestOptions } from './request-options'
+import { getUrlWithQuery } from './query'
 
 export async function getStream(url: string, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+    if (options?.query) {
+        url = getUrlWithQuery(url, options.query)
+    }
     const { protocol, httpRequestOptions } = getHTTPRequestOptions('GET', url, options)
     const request = await importHttpRequest(protocol)
     return new Promise<IncomingMessage>((resolve, reject) => {
@@ -33,6 +37,9 @@ export async function putStream(url: string, readableStream: NodeJS.ReadableStre
 }
 
 async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+    if (options?.query) {
+        url = getUrlWithQuery(url, options.query)
+    }
     const { protocol, httpRequestOptions } = getHTTPRequestOptions(method, url, options)
     const request = await importHttpRequest(protocol)
     let req: ClientRequest | undefined

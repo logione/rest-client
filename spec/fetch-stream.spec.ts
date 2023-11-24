@@ -60,9 +60,12 @@ describe('fetch-stream specs', () => {
             response.push(null)
             responseBody = response
 
-            const result = await streamToString(await getStream('http://localhost:5001/testgetstream', { token: 'fakeToken' }))
+            const result = await streamToString(
+                await getStream('http://localhost:5001/testgetstream?page=3&',
+                { token: 'fakeToken', query: 'limit=1' })
+            )
             expect(result).toEqual('beep')
-            expect(lastRequest!.url).toBe('/testgetstream')
+            expect(lastRequest!.url).toBe('/testgetstream?page=3&limit=1')
             expect(lastRequest!.method).toBe('GET')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBeUndefined()
@@ -104,8 +107,14 @@ describe('fetch-stream specs', () => {
             stream.push('beep') 
             stream.push(null)
 
-            await postStream('http://localhost:5001/testpoststream', stream, { token: 'fakeToken', headers: { 'fake-header': 'fake' }})
-            expect(lastRequest!.url).toBe('/testpoststream')
+            await postStream(
+                'http://localhost:5001/testpoststream',
+                stream, {
+                    token: 'fakeToken',
+                    headers: { 'fake-header': 'fake' },
+                    query: { asc: true, sort: 'test' }
+            })
+            expect(lastRequest!.url).toBe('/testpoststream?asc=true&sort=test')
             expect(lastRequest!.method).toBe('POST')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBeUndefined()

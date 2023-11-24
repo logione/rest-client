@@ -1,3 +1,4 @@
+import { getUrlWithQuery } from './query'
 import { RequestError } from './request-error'
 import { RequestOptions } from './request-options'
 
@@ -32,6 +33,10 @@ export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
 
     if (options.token) {
         headers.Authorization = `Bearer ${options.token}`
+    }
+
+    if (options.query) {
+        url = getUrlWithQuery(url, options.query)
     }
 
     const result = await fetch(url, requestInit)

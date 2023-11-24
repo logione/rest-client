@@ -59,10 +59,17 @@ describe('fetch-json specs', () => {
         it('should post data and parse json', async () => {
             status = 200
             responseBody = JSON.stringify({ fake: 'DataUpdated' })
-            const result = await postJSON<{ fake: string }>('http://localhost:5001/testpost', { body: { fake: 'Data' }, token: 'fakeToken', headers: { 'custom-header': 'OK' } })
+            const result = await postJSON<{ fake: string }>(
+                'http://localhost:5001/testpost', { 
+                    body: { fake: 'Data' },
+                    token: 'fakeToken',
+                    headers: { 'custom-header': 'OK' },
+                    query: { email: 'noreply@logi.one', pages: [1, 3] } 
+                }
+            )
             expect(lastRequestBody).toEqual({ fake: 'Data'})
             expect(result).toEqual({ fake: 'DataUpdated'})
-            expect(lastRequest!.url).toBe('/testpost')
+            expect(lastRequest!.url).toBe('/testpost?email=noreply%40logi.one&pages=1&pages=3')
             expect(lastRequest!.method).toBe('POST')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBe('application/json')
@@ -108,10 +115,16 @@ describe('fetch-json specs', () => {
         it('should put data and parse json', async () => {
             status = 200
             responseBody = JSON.stringify({ fake: 'DataUpdated' })
-            const result = await putJSON<{ fake: string }>('http://localhost:5001/testput', { body: { fake: 'Data' }, token: 'fakeToken', headers: { 'custom-header': 'OK' } })
+            const result = await putJSON<{ fake: string }>(
+                'http://localhost:5001/testput', {
+                    body: { fake: 'Data' },
+                    token: 'fakeToken',
+                    headers: { 'custom-header': 'OK' },
+                    query: 'page=1&page=2' 
+            })
             expect(lastRequestBody).toEqual({ fake: 'Data'})
             expect(result).toEqual({ fake: 'DataUpdated'})
-            expect(lastRequest!.url).toBe('/testput')
+            expect(lastRequest!.url).toBe('/testput?page=1&page=2')
             expect(lastRequest!.method).toBe('PUT')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBe('application/json')
@@ -149,9 +162,15 @@ describe('fetch-json specs', () => {
         it('should get data and parse json', async () => {
             status = 200
             responseBody = JSON.stringify({ fake: 'DataUpdated' })
-            const result = await getJSON<{ fake: string }>('http://localhost:5001/testget', { token: 'fakeToken', headers: { 'custom-header': 'OK' } })
+            const result = await getJSON<{ fake: string }>(
+                'http://localhost:5001/testget?limit=2', {
+                    token: 'fakeToken',
+                    headers: { 'custom-header': 'OK' },
+                    query: ['type=email', 'page=1']
+                }
+            )
             expect(result).toEqual({ fake: 'DataUpdated'})
-            expect(lastRequest!.url).toBe('/testget')
+            expect(lastRequest!.url).toBe('/testget?limit=2&type=email&page=1')
             expect(lastRequest!.method).toBe('GET')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBeUndefined()

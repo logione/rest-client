@@ -46,10 +46,17 @@ describe('fetch specs', () => {
         it('should post data and parse json', async () => {
             status = 200
             responseBody = 'DataUpdated'
-            const result = await post('http://localhost:5001/testpost', { body: 'Data', token: 'fakeToken', headers: { 'custom-header': 'OK' } })
+            const result = await post(
+                'http://localhost:5001/testpost', { 
+                    body: 'Data',
+                    token: 'fakeToken',
+                    headers: { 'custom-header': 'OK' },
+                    query: { limit: 1, sort: ['name', 'name2'] }
+                }
+            )
             expect(lastRequestBody).toEqual('Data')
             expect(await result.text()).toEqual('DataUpdated')
-            expect(lastRequest!.url).toBe('/testpost')
+            expect(lastRequest!.url).toBe('/testpost?limit=1&sort=name&sort=name2')
             expect(lastRequest!.method).toBe('POST')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBe('text/plain;charset=UTF-8')
