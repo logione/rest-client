@@ -64,12 +64,12 @@ describe('fetch-json specs', () => {
                     body: { fake: 'Data' },
                     token: 'fakeToken',
                     headers: { 'custom-header': 'OK' },
-                    query: { email: 'noreply@logi.one', pages: [1, 3] } 
+                    search: { email: 'noreply@logi.one', pages: 1 } 
                 }
             )
             expect(lastRequestBody).toEqual({ fake: 'Data'})
             expect(result).toEqual({ fake: 'DataUpdated'})
-            expect(lastRequest!.url).toBe('/testpost?email=noreply%40logi.one&pages=1&pages=3')
+            expect(lastRequest!.url).toBe('/testpost?email=noreply%40logi.one&pages=1')
             expect(lastRequest!.method).toBe('POST')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBe('application/json')
@@ -120,7 +120,7 @@ describe('fetch-json specs', () => {
                     body: { fake: 'Data' },
                     token: 'fakeToken',
                     headers: { 'custom-header': 'OK' },
-                    query: 'page=1&page=2' 
+                    search: 'page=1&page=2' 
             })
             expect(lastRequestBody).toEqual({ fake: 'Data'})
             expect(result).toEqual({ fake: 'DataUpdated'})
@@ -166,7 +166,7 @@ describe('fetch-json specs', () => {
                 'http://localhost:5001/testget?limit=2', {
                     token: 'fakeToken',
                     headers: { 'custom-header': 'OK' },
-                    query: ['type=email', 'page=1']
+                    search: [['type', 'email'], ['page', '1']]
                 }
             )
             expect(result).toEqual({ fake: 'DataUpdated'})

@@ -62,7 +62,7 @@ describe('fetch-stream specs', () => {
 
             const result = await streamToString(
                 await getStream('http://localhost:5001/testgetstream?page=3&',
-                { token: 'fakeToken', query: 'limit=1' })
+                { token: 'fakeToken', search: 'limit=1' })
             )
             expect(result).toEqual('beep')
             expect(lastRequest!.url).toBe('/testgetstream?page=3&limit=1')
@@ -112,7 +112,7 @@ describe('fetch-stream specs', () => {
                 stream, {
                     token: 'fakeToken',
                     headers: { 'fake-header': 'fake' },
-                    query: { asc: true, sort: 'test' }
+                    search: { asc: true, sort: 'test' }
             })
             expect(lastRequest!.url).toBe('/testpoststream?asc=true&sort=test')
             expect(lastRequest!.method).toBe('POST')

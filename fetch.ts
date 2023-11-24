@@ -1,4 +1,4 @@
-import { getUrlWithQuery } from './query'
+import { appendSearchToURL } from './search'
 import { RequestError } from './request-error'
 import { RequestOptions } from './request-options'
 
@@ -35,10 +35,7 @@ export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
         headers.Authorization = `Bearer ${options.token}`
     }
 
-    if (options.query) {
-        url = getUrlWithQuery(url, options.query)
-    }
-
+    url = appendSearchToURL(url, options.search)
     const result = await fetch(url, requestInit)
     if (!result.ok) {
         throw new RequestError(result.statusText, result.status, result)

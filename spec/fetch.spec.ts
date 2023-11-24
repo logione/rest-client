@@ -51,12 +51,12 @@ describe('fetch specs', () => {
                     body: 'Data',
                     token: 'fakeToken',
                     headers: { 'custom-header': 'OK' },
-                    query: { limit: 1, sort: ['name', 'name2'] }
+                    search: { limit: 1, sort: 'name' }
                 }
             )
             expect(lastRequestBody).toEqual('Data')
             expect(await result.text()).toEqual('DataUpdated')
-            expect(lastRequest!.url).toBe('/testpost?limit=1&sort=name&sort=name2')
+            expect(lastRequest!.url).toBe('/testpost?limit=1&sort=name')
             expect(lastRequest!.method).toBe('POST')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBe('text/plain;charset=UTF-8')
