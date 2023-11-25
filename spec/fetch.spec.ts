@@ -1,6 +1,7 @@
 import { createServer, IncomingMessage, Server } from 'http'
 
 import { del, get, post, put } from '../fetch'
+import { RequestError } from '../request-error'
 
 describe('fetch specs', () => {
     let server: Server
@@ -86,6 +87,18 @@ describe('fetch specs', () => {
             }
             expect(error?.status).toBe(500)
         })
+          
+        it('should set headers on error', async () => {
+            status = 300
+            let error: RequestError | undefined
+            try {
+                await post('http://localhost:5001/testpost', { body: 'Data' })
+            } catch (err: any) {
+                error = err
+            }
+            expect(error?.headers instanceof Headers).toBeTrue()
+            expect(error?.headers.get('transfer-encoding')).toEqual('chunked')
+        })
 
         it('should throw an error if cannot connect to server', async () => {
             let error: any
@@ -127,6 +140,18 @@ describe('fetch specs', () => {
             }
             expect(error?.status).toBe(300)
         })
+                  
+        it('should set headers on error', async () => {
+            status = 300
+            let error: RequestError | undefined
+            try {
+                await put('http://localhost:5001/testput', { body: 'Data' })
+            } catch (err: any) {
+                error = err
+            }
+            expect(error?.headers instanceof Headers).toBeTrue()
+            expect(error?.headers.get('transfer-encoding')).toEqual('chunked')
+        })
 
         it('should throw an error if cannot connect to server', async () => {
             let error: any
@@ -167,6 +192,18 @@ describe('fetch specs', () => {
             }
             expect(error?.status).toBe(300)
         })
+                          
+        it('should set headers on error', async () => {
+            status = 300
+            let error: RequestError | undefined
+            try {
+                await get('http://localhost:5001/testget')
+            } catch (err: any) {
+                error = err
+            }
+            expect(error?.headers instanceof Headers).toBeTrue()
+            expect(error?.headers.get('transfer-encoding')).toEqual('chunked')
+        })
         
         it('should throw an error if cannot connect to server', async () => {
             let error: any
@@ -206,6 +243,18 @@ describe('fetch specs', () => {
                 error = err
             }
             expect(error?.status).toBe(300)
+        })
+                                  
+        it('should set headers on error', async () => {
+            status = 300
+            let error: RequestError | undefined
+            try {
+                await del('http://localhost:5001/testdelete')
+            } catch (err: any) {
+                error = err
+            }
+            expect(error?.headers instanceof Headers).toBeTrue()
+            expect(error?.headers.get('transfer-encoding')).toEqual('chunked')
         })
         
         it('should throw an error if cannot connect to server', async () => {

@@ -102,7 +102,8 @@ try {
   await getJSON('https://api.github.com/repos/logione/rest-client-fake')
 } catch (error) { // throws an error if the request fails or the response status is not 2xx
   if (error.status) {
-    console.log(error.response.headers) // error.response is the original fetch Response object
+    console.log(error.response) // error.response is the original fetch Response object
+    console.log(error.headers) // error.headers === error.response.headers
     console.log(error.status) // error.status === error.response.status
     console.log(error.message) // error.message === error.response.statusText
   } else {
@@ -114,7 +115,8 @@ try {
   await getStream('https://my-source-api/files/1')
 } catch (error) { // throws an error if the request fails or the response status is not 2xx
   if (error.status) {
-    console.log(error.response.headers) // error.response is the original http IncomingMessage object
+    console.log(error.response) // error.response is the original http IncomingMessage object
+    console.log(error.headers) // error.headers is formated has an Headers object
     console.log(error.status) // error.status === error.response.statusCode
     console.log(error.message) // error.message === error.response.statusMessage
   } else {

@@ -1,4 +1,4 @@
-import { ClientRequest, IncomingMessage, RequestOptions as HTTPRequestOptions } from 'http'
+import { ClientRequest, IncomingMessage, RequestOptions as HTTPRequestOptions, IncomingHttpHeaders } from 'http'
 import { pipeline } from 'stream/promises'
 
 import { RequestError } from './request-error'
@@ -14,7 +14,7 @@ export async function getStream(url: string, options?: RequestOptions<undefined>
             if (!response.statusCode) {
                 reject(new Error('No status code'))
             } else if (response.statusCode < 200 || response.statusCode > 299) {
-                reject(new RequestError(response.statusMessage || '', response.statusCode, response))
+                reject(new RequestError(response.statusMessage || '', response.statusCode, getHeaders(response.headers), response))
             } else {
                 resolve(response)
             }
@@ -44,7 +44,7 @@ async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStre
             if (!response.statusCode) {
                 reject(new Error('No status code'))
             } else if (response.statusCode < 200 || response.statusCode > 299) {
-                reject(new RequestError(response.statusMessage || '', response.statusCode, response))
+                reject(new RequestError(response.statusMessage || '', response.statusCode, getHeaders(response.headers), response))
             } else {
                 resolve(response)
             }
@@ -54,6 +54,22 @@ async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStre
     return promise
 }
 
+function getHeaders(incomingHttpHeaders: IncomingHttpHeaders): Headers {
+    const headers = new Headers()
+    for (const key in incomingHttpHeaders) {
+        if (incomingHttpHeaders.hasOwnProperty(key)) {
+            const value = incomingHttpHeaders[key]
+            if (Array.isArray(value)) {
+                for (const v of value) {
+                    headers.append(key, v)
+                }
+            } else {
+                headers.append(key, value ?? '')
+            }
+        }
+    }
+    return headers
+}
 
 function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, options: RequestOptions<undefined> = {}): { protocol: string, httpRequestOptions: HTTPRequestOptions } {
     const urlParsed = new URL(url)

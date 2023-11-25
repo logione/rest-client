@@ -38,7 +38,7 @@ export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
     url = appendSearchToURL(url, options.search)
     const result = await fetch(url, requestInit)
     if (!result.ok) {
-        throw new RequestError(result.statusText, result.status, result)
+        throw new RequestError(result.statusText, result.status, result.headers, result)
     }
     return result
 }
