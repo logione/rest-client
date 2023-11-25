@@ -28,7 +28,9 @@ function convertSearchToURLSearchParams(query?: Search) {
 
     const urlSearchParams = new URLSearchParams()
     for (const key in query) {
-        urlSearchParams.append(key, query[key].toString())
+        if (query.hasOwnProperty(key)) {
+            urlSearchParams.append(key, query[key].toString())
+        }
     }
     return urlSearchParams
 }
