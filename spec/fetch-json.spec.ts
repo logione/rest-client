@@ -2,6 +2,25 @@ import { createServer, IncomingMessage, Server } from 'http'
 
 import { deleteJSON, getJSON, postJSON, putJSON } from '../fetch-json'
 import { RequestError } from '../request-error'
+import { StandardSchemaV1 } from '../standard-schema.v1'
+import { SchemaValidationError } from '../schema-validation-error'
+
+class TestStandardSchema implements StandardSchemaV1<{ value: string }, { value: number }> {
+    '~standard': StandardSchemaV1.Props<{ value: string }, { value: number }> = {
+        version: 1,
+        vendor: 'test',
+        validate: (data: unknown) => {
+            if (typeof data !== 'object' || data === null || !('value' in data) || typeof data.value !== 'string') {
+                return { issues: [{ message: 'Not formated correctly' }] }
+            }
+            const value = parseInt(data.value)
+            if (isNaN(value)) {
+                return { issues: [{ message: 'Value is not a number' }] }
+            }
+            return { value: { value } }
+        }
+    }
+}
 
 describe('fetch-json specs', () => {
     let server: Server
@@ -9,6 +28,7 @@ describe('fetch-json specs', () => {
     let lastRequest: IncomingMessage | undefined
     let lastRequestBody: unknown
     let responseBody: string
+    const schema = new TestStandardSchema() 
 
     beforeAll(async () => {
         server = createServer(async (req, res) => {
@@ -84,6 +104,36 @@ describe('fetch-json specs', () => {
             await postJSON<{ fake: string }>('http://localhost:5001/testpost', { body: { fake: 'Data' }})
             expect(lastRequest!.headers.authorization).toBeUndefined()
         })
+
+        it('should validate schema if provided', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value: '-250' })
+            const result = await postJSON(
+                'http://localhost:5001/testpost', { 
+                    body: { fake: 'Data' },
+                    schema
+                }
+            )
+            expect(result).toEqual({ value: -250 })
+        })
+
+        it('should throw a SchemaValidationError if schema validation fails', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value2: '-250' })
+            let error
+            try {
+                await postJSON('http://localhost:5001/testpost', { 
+                    body: { fake: 'Data' },
+                    schema
+                })
+            } catch (err) {
+                error = err
+                expect(err instanceof SchemaValidationError).toBeTrue()
+                expect((err as SchemaValidationError).message).toBe('Schema validation error')
+                expect((err as SchemaValidationError).issues).toEqual([{ message: 'Not formated correctly' }])
+            }
+            expect(error).toBeDefined()
+        })
     
         it('should throw status if bigger than 299', async () => {
             status = 300
@@ -151,6 +201,36 @@ describe('fetch-json specs', () => {
             await putJSON<{ fake: string }>('http://localhost:5001/testput', { body: { fake: 'Data' }})
             expect(lastRequest!.headers.authorization).toBeUndefined()
         })
+
+        it('should validate schema if provided', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value: '-250' })
+            const result = await putJSON(
+                'http://localhost:5001/testput', { 
+                    body: { fake: 'Data' },
+                    schema
+                }
+            )
+            expect(result).toEqual({ value: -250 })
+        })
+
+        it('should throw a SchemaValidationError if schema validation fails', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value2: '-250' })
+            let error
+            try {
+                await putJSON('http://localhost:5001/testput', { 
+                    body: { fake: 'Data' },
+                    schema
+                })
+            } catch (err) {
+                error = err
+                expect(err instanceof SchemaValidationError).toBeTrue()
+                expect((err as SchemaValidationError).message).toBe('Schema validation error')
+                expect((err as SchemaValidationError).issues).toEqual([{ message: 'Not formated correctly' }])
+            }
+            expect(error).toBeDefined()
+        })
     
         it('should throw status if bigger than 299', async () => {
             status = 300
@@ -209,6 +289,30 @@ describe('fetch-json specs', () => {
             await getJSON<{ fake: string }>('http://localhost:5001/testget')
             expect(lastRequest!.headers.authorization).toBeUndefined()
         })
+
+        it('should validate schema if provided', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value: '100' })
+            const result = await getJSON(
+                'http://localhost:5001/testget', { schema }
+            )
+            expect(result).toEqual({ value: 100 })
+        })
+
+        it('should throw a SchemaValidationError if schema validation fails', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value: 'NotANumber' })
+            let error
+            try {
+                await getJSON('http://localhost:5001/testget', { schema })
+            } catch (err) {
+                error = err
+                expect(err instanceof SchemaValidationError).toBeTrue()
+                expect((err as SchemaValidationError).message).toBe('Schema validation error')
+                expect((err as SchemaValidationError).issues).toEqual([{ message: 'Value is not a number' }])
+            }
+            expect(error).toBeDefined()
+        })
     
         it('should throw status if bigger than 299', async () => {
             status = 300
@@ -264,6 +368,30 @@ describe('fetch-json specs', () => {
             responseBody = 'OK'
             const result2 = await deleteJSON<string>('http://localhost:5001/testdelete', { token: 'fakeToken' })
             expect(result2).toEqual('OK')
+        })
+
+        it('should validate schema if provided', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value: '100' })
+            const result = await deleteJSON(
+                'http://localhost:5001/testdelete', { schema }
+            )
+            expect(result).toEqual({ value: 100 })
+        })
+
+        it('should throw a SchemaValidationError if schema validation fails', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value: 'NotANumber' })
+            let error
+            try {
+                await deleteJSON('http://localhost:5001/testdelete', { schema })
+            } catch (err) {
+                error = err
+                expect(err instanceof SchemaValidationError).toBeTrue()
+                expect((err as SchemaValidationError).message).toBe('Schema validation error')
+                expect((err as SchemaValidationError).issues).toEqual([{ message: 'Value is not a number' }])
+            }
+            expect(error).toBeDefined()
         })
     
         it('should throw status if bigger than 299', async () => {
