@@ -1,6 +1,6 @@
 {
   "name": "@logi.one/rest-client",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "This is a free, ultra-lightweight and easy to use rest client for node.js supporting JSON requests and streams with no external dependencies.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
