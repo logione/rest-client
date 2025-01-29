@@ -44,7 +44,7 @@ console.log(response.message)
  
 ```javascript
 import { getJSON } from '@logi.one/rest-client'
-import { z } from 'zod' // Example with zod but others libaries can be used
+import { z } from 'zod' // Example with zod but other libraries can be used.
 
 const schema = z.object({
     email: z.string().email(),
