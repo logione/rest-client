@@ -1,8 +1,10 @@
 # Rest Client by LogiONE
 
-This is a free, ultra-lightweight and easy to use rest client for node.js supporting JSON requests and streams with no external dependencies.
+This is a free, ultra-lightweight and easy-to-use http(s) client for node.js supporting JSON requests and streams with no external dependencies.
 
 It uses the native node.js http and https modules and fetch to provide a simple interface for making http(s) requests.
+
+**New: it supports [Standard Schema](https://standardschema.dev) validation. So, you can validate the data received from any API with your preferred library ([list of supported libraries](https://github.com/standard-schema/standard-schema/blob/main/packages/spec/README.md#what-schema-libraries-implement-the-spec)).**
 
 ## Installation
 
@@ -36,6 +38,27 @@ console.log(response.name)
 const headers = { 'X-Custom-Header': 'value' }
 response = await deleteJSON('https://myapi/addresses/1', { token, headers })
 console.log(response.message) 
+```
+
+### JSON request with schema validation 
+ 
+```javascript
+import { getJSON } from '@logi.one/rest-client'
+import { z } from 'zod' // Example with zod but others libaries can be used
+
+const schema = z.object({
+    email: z.string().email(),
+    age: z.number()
+})
+
+try {
+  const { email, age } = await getJSON('https://example.com/data.json', { schema })
+  console.log(email, age) // email and age are valid
+} catch (err) {
+  if (err.issues) {
+    console.error(err.issues) // throws an error if the response does not match the schema
+  }
+}
 ```
 
 ### Stream requests
