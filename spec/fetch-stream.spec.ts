@@ -19,7 +19,7 @@ describe('fetch-stream specs', () => {
         })
     }
 
-    beforeAll(() => {
+    beforeAll(async () => {
         server = createServer(async (req, res) => {
             lastRequest = req
             let body = ''
@@ -36,7 +36,10 @@ describe('fetch-stream specs', () => {
                 }
             })
         })
-        server.listen(5001)
+        await new Promise<void>((resolve) => {
+            server.listen(5001, undefined, resolve)
+        })
+        await new Promise<void>((resolve) => setTimeout(resolve, 100))
     })
 
     beforeEach(() => {

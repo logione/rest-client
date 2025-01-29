@@ -10,7 +10,7 @@ describe('fetch-json specs', () => {
     let lastRequestBody: unknown
     let responseBody: string
 
-    beforeAll(() => {
+    beforeAll(async () => {
         server = createServer(async (req, res) => {
             lastRequest = req
             let body = ''
@@ -41,7 +41,10 @@ describe('fetch-json specs', () => {
                 }
             })
         })
-        server.listen(5001)
+        await new Promise<void>((resolve) => {
+            server.listen(5001, undefined, resolve)
+        })
+        await new Promise<void>((resolve) => setTimeout(resolve, 100))
     })
 
     beforeEach(() => {
