@@ -40,9 +40,8 @@ async function requestJSON<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
         }
     }
     const result = await request(method, url, { ...options, headers, body } as RequestOptions<string>)
-    const contentType = result.headers.get('content-type')
     let parsedResult
-    if (contentType && contentType.startsWith('application/json')) {
+    if (isJSONContentType(result.headers.get('content-type'))) {
         parsedResult = await result.json()
     } else {
         parsedResult = await result.text()
@@ -51,6 +50,14 @@ async function requestJSON<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
         return validateSchema(options.schema, parsedResult)
     }
     return parsedResult
+}
+
+function isJSONContentType(contentType: string | null): boolean {
+    if (!contentType) {
+        return false
+    }
+    const mediaType = contentType.split(';')[0].trim().toLowerCase()
+    return mediaType === 'application/json' || mediaType.endsWith('+json')
 }
 
 async function validateSchema<T extends StandardSchemaV1>(schema: T, input: StandardSchemaV1.InferInput<T>): Promise<StandardSchemaV1.InferOutput<T>> {

@@ -28,6 +28,7 @@ describe('fetch-json specs', () => {
     let lastRequest: IncomingMessage | undefined
     let lastRequestBody: unknown
     let responseBody: string
+    let responseContentType: string
     const schema = new TestStandardSchema() 
 
     beforeAll(async () => {
@@ -48,7 +49,7 @@ describe('fetch-json specs', () => {
                 if (typeof responseBody === 'string' && responseBody) {
                     try {
                         JSON.parse(responseBody)
-                        res.setHeader('Content-Type', 'application/json; charset=utf-8')
+                        res.setHeader('Content-Type', responseContentType)
                     } catch (err) {
                     }
                 }
@@ -70,6 +71,7 @@ describe('fetch-json specs', () => {
     beforeEach(() => {
         status = 204
         responseBody = ''
+        responseContentType = 'application/json; charset=utf-8'
         lastRequestBody = undefined
     })
 
@@ -90,6 +92,24 @@ describe('fetch-json specs', () => {
 
         await getJSON('http://localhost:5001/testget', { headers })
         expect(lastRequest!.headers.authorization).toBeUndefined()
+    })
+
+    it('should parse structured JSON content types', async () => {
+        status = 200
+        responseBody = JSON.stringify({ title: 'Not found' })
+        for (const contentType of ['application/problem+json', 'application/vnd.api+json; charset=utf-8', 'Application/JSON']) {
+            responseContentType = contentType
+            const result = await getJSON('http://localhost:5001/testget')
+            expect(result).withContext(contentType).toEqual({ title: 'Not found' })
+        }
+    })
+
+    it('should not parse non JSON content types', async () => {
+        status = 200
+        responseBody = JSON.stringify({ title: 'Not found' })
+        responseContentType = 'text/plain'
+        const result = await getJSON('http://localhost:5001/testget')
+        expect(result).toBe('{"title":"Not found"}')
     })
 
     it('should send falsy JSON bodies', async () => {
@@ -162,12 +182,13 @@ describe('fetch-json specs', () => {
             } catch (err) {
                 error = err
                 expect(err instanceof SchemaValidationError).toBeTrue()
+                expect((err as SchemaValidationError).name).toBe('SchemaValidationError')
                 expect((err as SchemaValidationError).message).toBe('Schema validation error')
                 expect((err as SchemaValidationError).issues).toEqual([{ message: 'Not formated correctly' }])
             }
             expect(error).toBeDefined()
         })
-    
+
         it('should throw status if bigger than 299', async () => {
             status = 300
             let error: any
@@ -177,6 +198,7 @@ describe('fetch-json specs', () => {
                 error = err
             }
             expect(error?.status).toBe(300)
+            expect(error?.name).toBe('RequestError')
 
             status = 500
             try {

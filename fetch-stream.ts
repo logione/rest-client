@@ -99,7 +99,8 @@ function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, opti
         setHeader(headers, 'Authorization', `Bearer ${options.token}`)
     }
     const httpRequestOptions: HTTPRequestOptions = {
-        hostname: urlParsed.hostname,
+        // URL keeps the brackets of IPv6 hosts ([::1]) but http.request expects them without.
+        hostname: urlParsed.hostname.replace(/^\[(.*)\]$/, '$1'),
         port: urlParsed.port ? +urlParsed.port : (urlParsed.protocol === 'http:' ? 80 : 443),
         path: `${urlParsed.pathname}${urlParsed.search}`,
         method,

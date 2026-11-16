@@ -76,6 +76,17 @@ describe('fetch-stream specs', () => {
         expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
     })
 
+    it('should support IPv6 hosts', async () => {
+        status = 200
+        const response = new Readable()
+        response.push('beep')
+        response.push(null)
+        responseBody = response
+
+        const result = await streamToString(await getStream('http://[::1]:5001/testgetstream'))
+        expect(result).toEqual('beep')
+    })
+
     describe('GET', () => {
         it('should get stream', async () => {
             status = 200
