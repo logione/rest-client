@@ -378,7 +378,7 @@ describe('fetch specs', () => {
 
         it('should reject an invalid timeout without sending the request', async () => {
             lastRequest = undefined
-            for (const timeout of [-1, NaN, Infinity, '100' as any]) {
+            for (const timeout of [-1, -Infinity, NaN, '100' as any]) {
                 await expectAsync(get('http://localhost:5001/testget', { timeout })).withContext(String(timeout)).toBeRejectedWithError(RangeError)
             }
             expect(lastRequest).toBeUndefined()

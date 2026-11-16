@@ -147,7 +147,7 @@ await get('https://myapi/texts?page=1&limit=2&filter=noreply%40fake.ch')
 
 ### Cancellation and timeouts
 
-All functions accept a `timeout` in milliseconds and an [`AbortSignal`](https://developer.mozilla.org/docs/Web/API/AbortSignal). Aborting rejects the request with an `AbortError`, or a `TimeoutError` when the timeout expires. When both are set, whichever comes first aborts the request.
+All functions accept a `timeout` in milliseconds and an [`AbortSignal`](https://developer.mozilla.org/docs/Web/API/AbortSignal). Aborting rejects the request with an `AbortError`, or a `TimeoutError` when the timeout expires. When both are set, whichever comes first aborts the request. A `timeout` of `null` or `Infinity` means no timeout.
 
 The timeout covers the whole request, including reading the response body: for `getJSON` and the other JSON functions, until the body is parsed; for streams, aborting after the response has started destroys the response stream, so a long download is cut off even while data is still arriving.
 
@@ -199,10 +199,14 @@ api.token = 'MyNewToken' // e.g. after a login or a token refresh
 api.timeout = undefined
 api.setHeader('Accept-Language', 'fr')
 api.removeHeader('X-Custom-Header')
+
+// Without the defaults, e.g. for a presigned URL that rejects an Authorization header
+await api.put(presignedUrl, { body: file, ignoreDefaults: true })
 ```
 
-- **URLs**: the base URL and a relative URL are joined with exactly one slash. Absolute URLs (`https://…`, `//host/…`) are used as is.
-- **Options of a request win over the defaults**: its `token`, `timeout` and `credentials` replace the defaults, and its headers replace the default headers of the same name (ignoring case). A request with its own `Authorization` header doesn't get the default token.
+- **URLs**: the base URL and a relative URL are joined with exactly one slash, so `https://myapi/v1/` or `https://myapi/v1` with `/items` or `items` all give `https://myapi/v1/items`. `http://…`, `https://…` and `//host/…` URLs are used as is (`//host/…` only works in browsers). Paths are joined as is.
+- **Absolute URLs still get the default token and headers.** For a URL that must not get them, such as a presigned storage URL or a link to another API, pass `ignoreDefaults: true`: the request is then sent without any default (base URL, token, headers, timeout, credentials), as with the plain functions.
+- **Options of a request win over the defaults**: its `token`, `timeout` and `credentials` replace the defaults, and its headers replace the default headers of the same name (ignoring case). A request with its own `Authorization` header doesn't get the default token. `timeout: null` or `Infinity` removes the default timeout, e.g. for a long upload.
 
 ### Error handling
 

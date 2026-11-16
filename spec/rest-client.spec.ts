@@ -78,6 +78,17 @@ describe('RestClient specs', () => {
             expect(last().url).toBe('/absolute')
         })
 
+        it('should treat a path with a colon as relative', async () => {
+            await new RestClient({ baseUrl: `${ORIGIN}/v1` }).postJSON('documents:search')
+            expect(last().url).toBe('/v1/documents:search')
+        })
+
+        it('should use a protocol-relative URL as is', async () => {
+            const fetchSpy = spyOn(globalThis, 'fetch').and.callFake(async () => new Response('{}', { headers: { 'Content-Type': 'application/json' } }))
+            await new RestClient({ baseUrl: `${ORIGIN}/v1` }).getJSON('//cdn.example.com/file')
+            expect(fetchSpy.calls.mostRecent().args[0]).toBe('//cdn.example.com/file')
+        })
+
         it('should use the URL as is without a base URL', async () => {
             await new RestClient().getJSON(`${ORIGIN}/items`)
             expect(last().url).toBe('/items')
@@ -166,12 +177,54 @@ describe('RestClient specs', () => {
         })
     })
 
+    describe('ignoreDefaults', () => {
+        const client = () => new RestClient({ baseUrl: `${ORIGIN}/v1`, token: 'secret', headers: { 'X-App': 'test' }, timeout: 20 })
+
+        it('should send the request without any default', async () => {
+            await client().getJSON(`${ORIGIN}/presigned`, { ignoreDefaults: true })
+            await client().get(`${ORIGIN}/slow`, { ignoreDefaults: true })
+            const stream = await client().getStream(`${ORIGIN}/presigned`, { ignoreDefaults: true })
+            stream.resume()
+            expect(received.map((r) => `${r.url} ${r.headers.authorization} ${r.headers['x-app']}`)).toEqual([
+                '/presigned undefined undefined', '/slow undefined undefined', '/presigned undefined undefined'
+            ])
+        })
+
+        it('should still send the request own options', async () => {
+            await client().getJSON(`${ORIGIN}/own`, { ignoreDefaults: true, token: 'own', headers: { 'X-Own': 'yes' }, search: { a: 1 } })
+            expect(last().url).toBe('/own?a=1')
+            expect(last().headers.authorization).toBe('Bearer own')
+            expect(last().headers['x-own']).toBe('yes')
+        })
+
+        it('should not use the base URL', async () => {
+            const fetchSpy = spyOn(globalThis, 'fetch').and.callFake(async () => new Response(''))
+            await client().get('relative', { ignoreDefaults: true })
+            expect(fetchSpy.calls.mostRecent().args[0]).toBe('relative')
+            expect('ignoreDefaults' in fetchSpy.calls.mostRecent().args[1]!).toBeFalse()
+        })
+
+        it('should keep the schema validation', async () => {
+            const schema: StandardSchemaV1<unknown, string> = {
+                '~standard': { version: 1, vendor: 'test', validate: (value: any) => ({ value: value.url }) }
+            }
+            const url: string = await client().getJSON(`${ORIGIN}/items`, { ignoreDefaults: true, schema })
+            expect(url).toBe('/items')
+        })
+    })
+
     describe('timeout and credentials', () => {
         it('should apply the default timeout and let a request override it', async () => {
             const client = new RestClient({ baseUrl: ORIGIN, timeout: 20 })
             await expectAsync(client.get('slow')).toBeRejectedWith(jasmine.objectContaining({ name: 'TimeoutError' }))
             client.timeout = undefined
             await expectAsync(client.get('slow', { timeout: 20 })).toBeRejectedWith(jasmine.objectContaining({ name: 'TimeoutError' }))
+        })
+
+        it('should let a request remove the default timeout with null or Infinity', async () => {
+            const client = new RestClient({ baseUrl: ORIGIN, timeout: 20 })
+            await expectAsync(client.get('slow', { timeout: null })).toBeResolved()
+            await expectAsync(client.get('slow', { timeout: Infinity })).toBeResolved()
         })
 
         it('should keep the request signal along with the default timeout', async () => {

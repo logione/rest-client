@@ -8,7 +8,8 @@ export interface RequestOptions<T> {
     body?: T | undefined
     search?: Search
     signal?: AbortSignal
-    timeout?: number
+    /** Milliseconds before the request is aborted. `null` or `Infinity` means no timeout. */
+    timeout?: number | null
     credentials?: 'omit' | 'same-origin' | 'include'
 }
 
