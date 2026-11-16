@@ -130,6 +130,8 @@ const headers = { 'X-Custom-Header': 'value' }
 await del('https://myapi/texts/1', { token, headers })
 ```
 
+The body can also be a stream: a web `ReadableStream`, or in Node.js any async iterable such as a `stream.Readable`. In browsers, Chromium only sends stream bodies over HTTP/2, and Firefox and Safari don't support them.
+
 ### URL Search parameters
 
 ```javascript

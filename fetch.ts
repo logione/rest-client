@@ -34,6 +34,10 @@ export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
     
     if (options.body !== undefined) {
         requestInit.body = options.body
+        if (isStreamBody(options.body)) {
+            // fetch requires duplex 'half' to send a stream body (missing from the DOM RequestInit type).
+            (requestInit as RequestInit & { duplex?: 'half' }).duplex = 'half'
+        }
     }
     if (options.signal) {
         requestInit.signal = options.signal
@@ -52,4 +56,12 @@ export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
         throw new RequestError(result.statusText, result.status, result.headers, result)
     }
     return result
+}
+
+/** A web ReadableStream, or in Node.js any async iterable (such as a stream.Readable), which fetch also accepts. */
+function isStreamBody(body: unknown): boolean {
+    if (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream) {
+        return true
+    }
+    return typeof body === 'object' && body !== null && Symbol.asyncIterator in body
 }

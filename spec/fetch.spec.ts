@@ -1,4 +1,5 @@
 import { createServer, IncomingMessage, Server } from 'http'
+import { Readable } from 'stream'
 
 import { del, get, post, put } from '../fetch'
 import { RequestError } from '../request-error'
@@ -300,6 +301,21 @@ describe('fetch specs', () => {
         const entries: [string, string][] = [['x-custom', 'a'], ['X-Custom', 'b']]
         await get('http://localhost:5001/testget', { headers: entries })
         expect(lastRequest!.headers['x-custom']).toBe('a, b')
+    })
+
+    it('should send a web ReadableStream or a Node.js Readable as body', async () => {
+        const webStream = new ReadableStream<Uint8Array>({
+            start(controller) {
+                controller.enqueue(new TextEncoder().encode('web '))
+                controller.enqueue(new TextEncoder().encode('stream'))
+                controller.close()
+            }
+        })
+        await post('http://localhost:5001/testpost', { body: webStream })
+        expect(lastRequestBody).toBe('web stream')
+
+        await put('http://localhost:5001/testput', { body: Readable.from([Buffer.from('node '), Buffer.from('stream')]) as any })
+        expect(lastRequestBody).toBe('node stream')
     })
 
     describe('signal', () => {
