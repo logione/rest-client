@@ -1,11 +1,13 @@
-import { Search } from './search'
-import { StandardSchemaV1 } from './standard-schema.v1'
+import { Search } from './search.js'
+import { StandardSchemaV1 } from './standard-schema.v1.js'
 
 export interface RequestOptions<T> {
     token?: string
     headers?: Record<string, string>
     body?: T | undefined
     search?: Search
+    signal?: AbortSignal
+    credentials?: 'omit' | 'same-origin' | 'include'
 }
 
 export interface RequestOptionsWithSchema<T, S extends StandardSchemaV1> extends RequestOptions<T> {

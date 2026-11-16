@@ -1,17 +1,32 @@
 {
   "name": "@logi.one/rest-client",
   "version": "0.6.0",
-  "description": "This is a free, ultra-lightweight and easy to use rest client for node.js supporting JSON requests and streams with no external dependencies.",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "This is a free, ultra-lightweight and easy to use rest client for Node.js and browsers supporting JSON requests and streams with no external dependencies.",
+  "main": "dist/cjs/index.js",
+  "types": "dist/cjs/index.d.ts",
+  "browser": "./dist/esm/browser.js",
+  "exports": {
+    ".": {
+      "browser": {
+        "types": "./dist/esm/browser.d.ts",
+        "default": "./dist/esm/browser.js"
+      },
+      "default": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "sideEffects": false,
   "files": [
     "/dist",
     "/README.md",
     "/LICENSE"
   ],
   "scripts": {
-    "test": "tsc -p . && jasmine",
-    "build": "tsc -p tsconfig.build.json",
+    "test": "tsc -p . && tsc -p tsconfig.browser.json --outDir dist/browser-test && jasmine",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.browser.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
     "prepublishOnly": "npm test",
     "prepack": "rm -rf dist && npm run build",
     "build-watch": "tsc -w"
@@ -29,10 +44,12 @@
     "@types/jasmine": "^7.0.0",
     "@types/node": "^26.6.6",
     "jasmine": "^7.0.0",
+    "playwright": "^1.65.1",
     "typescript": "^7.0.2"
   },
   "keywords": [
     "http",
+    "browser",
     "https",
     "stream",
     "JSON",

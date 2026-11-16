@@ -1,10 +1,10 @@
 import { ClientRequest, IncomingMessage, RequestOptions as HTTPRequestOptions, IncomingHttpHeaders } from 'http'
 import { pipeline } from 'stream/promises'
 
-import { RequestError } from './request-error'
-import { RequestOptions } from './request-options'
-import { appendSearchToURL } from './search'
-import { hasHeader, setHeader } from './headers'
+import { RequestError } from './request-error.js'
+import { RequestOptions } from './request-options.js'
+import { appendSearchToURL } from './search.js'
+import { hasHeader, setHeader } from './headers.js'
 
 export async function getStream(url: string, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
     url = appendSearchToURL(url, options?.search)
@@ -104,7 +104,8 @@ function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, opti
         port: urlParsed.port ? +urlParsed.port : (urlParsed.protocol === 'http:' ? 80 : 443),
         path: `${urlParsed.pathname}${urlParsed.search}`,
         method,
-        headers
+        headers,
+        signal: options.signal
     }
     return { protocol: urlParsed.protocol, httpRequestOptions }
 }

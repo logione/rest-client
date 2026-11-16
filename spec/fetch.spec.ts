@@ -289,4 +289,25 @@ describe('fetch specs', () => {
             expect(error.message).toBe('fetch failed')
         })
     })
+
+    describe('signal', () => {
+        it('should reject with an AbortError and not send the request when the signal is already aborted', async () => {
+            lastRequest = undefined
+            let error: any
+            try {
+                await get('http://localhost:5001/testabort', { signal: AbortSignal.abort() })
+            } catch (err) {
+                error = err
+            }
+            expect(error?.name).toBe('AbortError')
+            expect(lastRequest).toBeUndefined()
+        })
+
+        it('should complete normally when the signal is not aborted', async () => {
+            status = 200
+            responseBody = 'ok'
+            const response = await get('http://localhost:5001/testabort', { signal: new AbortController().signal })
+            expect(await response.text()).toBe('ok')
+        })
+    })
 })

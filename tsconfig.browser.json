@@ -1,0 +1,13 @@
+{
+    // ESM build of the browser entry. No Node.js types: using a Node API here is a compile error.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "module": "es2022",
+        "moduleResolution": "bundler",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "types": [],
+        "outDir": "./dist/esm"
+    },
+    "files": ["browser.ts"],
+    "include": []
+}

@@ -352,4 +352,46 @@ describe('fetch-stream specs', () => {
             expect(error.errno).toBe(-111)
         })
     })
+
+    describe('signal', () => {
+        it('should reject with an AbortError when the signal is already aborted', async () => {
+            let error: any
+            try {
+                await getStream('http://localhost:5001/testabort', { signal: AbortSignal.abort() })
+            } catch (err) {
+                error = err
+            }
+            expect(error?.name).toBe('AbortError')
+        })
+
+        it('should destroy the response stream when aborted after the response started', async () => {
+            status = 200
+            const endless = new Readable({ read() {} })
+            endless.push('beep')
+            responseBody = endless
+
+            const controller = new AbortController()
+            const stream = await getStream('http://localhost:5001/testabort', { signal: controller.signal })
+            const result = streamToString(stream)
+            controller.abort()
+            await expectAsync(result).toBeRejected()
+            expect(stream.destroyed).toBeTrue()
+            endless.destroy()
+        })
+
+        it('should abort an upload in progress', async () => {
+            const endless = new Readable({ read() {} })
+            endless.push('beep')
+            const controller = new AbortController()
+            setTimeout(() => controller.abort(), 50)
+            let error: any
+            try {
+                await postStream('http://localhost:5001/testabort', endless, { signal: controller.signal })
+            } catch (err) {
+                error = err
+            }
+            expect(error?.name).toBe('AbortError')
+            expect(endless.destroyed).toBeTrue()
+        })
+    })
 })

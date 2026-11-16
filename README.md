@@ -1,8 +1,8 @@
 # Rest Client by LogiONE
 
-This is a free, ultra-lightweight and easy-to-use http(s) client for Node.js supporting JSON requests and streams with no external dependencies.
+This is a free, ultra-lightweight and easy-to-use http(s) client for Node.js and browsers supporting JSON requests and streams with no external dependencies.
 
-It uses the native Node.js http and https modules and fetch to provide a simple interface for making http(s) requests.
+It uses fetch to provide a simple interface for making http(s) requests, and the native Node.js http and https modules for streams.
 
 **New: it supports [Standard Schema](https://standardschema.dev) validation. So, you can validate the data received from any API with your preferred library ([list of supported libraries](https://github.com/standard-schema/standard-schema/blob/main/packages/spec/README.md#what-schema-libraries-implement-the-spec)).**
 
@@ -12,7 +12,23 @@ It uses the native Node.js http and https modules and fetch to provide a simple 
 npm install @logi.one/rest-client
 ```
 
-With TypeScript, the type definitions also need the Node.js types (`npm install --save-dev @types/node`), which most Node.js projects already have.
+With TypeScript in a Node.js project, the type definitions also need the Node.js types (`npm install --save-dev @types/node`), which most Node.js projects already have. Browser projects don't need them.
+
+## Browser support
+
+The same import works in browsers: bundlers (Vite, webpack, esbuild, Rollup…) pick the browser build automatically through the `browser` export condition.
+
+```javascript
+import { getJSON } from '@logi.one/rest-client' // resolves to the browser build in a browser bundle
+```
+
+The browser build is plain ES modules, so it can also be loaded without a bundler (from `dist/esm/browser.js`).
+
+Differences from Node.js:
+
+- **Stream functions (`getStream`, `postStream`, `putStream`) are Node.js only** and are not exported by the browser build. In a browser, use `get` and read `response.body`, which is a web `ReadableStream`.
+- **No default `User-Agent` header.** In Node.js, requests send `User-Agent: node` unless you set one. Browsers set their own.
+- **CORS applies.** Cross-origin requests need the server to allow them. JSON requests with a body (`postJSON`, `putJSON`) send `Content-Type: application/json`, and `token` adds an `Authorization` header: both trigger a CORS preflight (`OPTIONS`) request, so the server must allow these headers.
 
 ## Usage
 
@@ -63,7 +79,7 @@ try {
 }
 ```
 
-### Stream requests
+### Stream requests (Node.js only)
 
 ```javascript
 import { getStream, postStream, putStream } from '@logi.one/rest-client'
@@ -117,6 +133,32 @@ await get('https://myapi/texts', { search: [['page', '1'], ['sort', 'true'], ['f
 await get('https://myapi/texts', { search: new URLSearchParams({ page: '1', sort: 'true', filter: 'noreply@fake.ch' })})
 await get('https://myapi/texts', { search: { page: 1, sort: true, filter: 'noreply@fake.ch' }})
 await get('https://myapi/texts?page=1&limit=2&filter=noreply%40fake.ch')
+```
+
+### Cancellation and timeouts
+
+All functions accept an [`AbortSignal`](https://developer.mozilla.org/docs/Web/API/AbortSignal). Aborting rejects the request with an `AbortError` (or a `TimeoutError` for `AbortSignal.timeout()`). For streams, aborting after the response has started destroys the response stream.
+
+```javascript
+import { getJSON } from '@logi.one/rest-client'
+
+// Give up after 5 seconds
+const data = await getJSON('https://myapi/slow', { signal: AbortSignal.timeout(5000) })
+
+// Or cancel it yourself
+const controller = new AbortController()
+const promise = getJSON('https://myapi/slow', { signal: controller.signal })
+controller.abort()
+```
+
+### Cookies and credentials (browser)
+
+In a browser, cross-origin requests don't send cookies by default. Set `credentials: 'include'` to send them (the server must answer with `Access-Control-Allow-Credentials: true` and an explicit `Access-Control-Allow-Origin`). It is the fetch [`credentials`](https://developer.mozilla.org/docs/Web/API/RequestInit#credentials) option: `'omit'`, `'same-origin'` (default) or `'include'`.
+
+```javascript
+import { getJSON } from '@logi.one/rest-client'
+
+const me = await getJSON('https://api.example.com/me', { credentials: 'include' })
 ```
 
 ### Error handling

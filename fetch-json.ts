@@ -1,8 +1,8 @@
-import { request } from './fetch'
-import { setHeader } from './headers'
-import { RequestOptions, RequestOptionsWithSchema } from './request-options'
-import { SchemaValidationError } from './schema-validation-error'
-import { StandardSchemaV1 } from './standard-schema.v1'
+import { request } from './fetch.js'
+import { setHeader } from './headers.js'
+import { RequestOptions, RequestOptionsWithSchema } from './request-options.js'
+import { SchemaValidationError } from './schema-validation-error.js'
+import { StandardSchemaV1 } from './standard-schema.v1.js'
 
 export function getJSON<T extends StandardSchemaV1>(url: string, options: RequestOptionsWithSchema<undefined, T>): Promise<StandardSchemaV1.InferOutput<T>>
 export function getJSON<T>(url: string, options?: RequestOptions<undefined>): Promise<T>

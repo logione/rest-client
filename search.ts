@@ -2,8 +2,8 @@ type SearchValue = string | number | boolean | null | undefined
 export type Search = Record<string, SearchValue> | string | [string, string][] | URLSearchParams
 
 export function appendSearchToURL(url: string, search?: Search): string {
-    const params = convertSearchToURLSearchParams(search)
-    if (params.size === 0) {
+    const query = convertSearchToURLSearchParams(search).toString()
+    if (query === '') {
         return url
     }
 
@@ -18,7 +18,7 @@ export function appendSearchToURL(url: string, search?: Search): string {
     } else {
         base += '?'
     }
-    return base + params.toString() + hash
+    return base + query + hash
 }
 
 function convertSearchToURLSearchParams(query?: Search) {
