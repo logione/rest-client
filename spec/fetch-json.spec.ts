@@ -92,6 +92,16 @@ describe('fetch-json specs', () => {
         expect(lastRequest!.headers.authorization).toBeUndefined()
     })
 
+    it('should send falsy JSON bodies', async () => {
+        status = 204
+        for (const body of [false, 0, null]) {
+            lastRequestBody = undefined
+            await postJSON('http://localhost:5001/testpost', { body })
+            expect(lastRequestBody).withContext(String(body)).toBe(body)
+            expect(lastRequest!.headers['content-type']).withContext(String(body)).toBe('application/json')
+        }
+    })
+
     describe('POST', () => {
         it('should post data and parse json', async () => {
             status = 200

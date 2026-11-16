@@ -27,7 +27,7 @@ export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
         method
     }
     
-    if (options.body) {
+    if (options.body !== undefined) {
         requestInit.body = options.body
     }
 

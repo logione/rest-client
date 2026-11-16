@@ -28,11 +28,10 @@ export function postJSON<T>(url: string, options?: RequestOptions<unknown>): Pro
 }
 
 async function requestJSON<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<unknown> | RequestOptionsWithSchema<unknown, any> = {}): Promise<T> {
-    // Work on copies so the caller's headers and body are never modified.
     const headers: Record<string, string> = { ...options.headers, Accept: 'application/json' }
     let body = options.body
 
-    if (body) {
+    if (body !== undefined) {
         headers['Content-Type'] = 'application/json'
         if (typeof body !== 'string') {
             body = JSON.stringify(body)
