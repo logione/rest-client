@@ -12,6 +12,8 @@ It uses the native Node.js http and https modules and fetch to provide a simple 
 npm install @logi.one/rest-client
 ```
 
+With TypeScript, the type definitions also need the Node.js types (`npm install --save-dev @types/node`), which most Node.js projects already have.
+
 ## Usage
 
 ### JSON requests
