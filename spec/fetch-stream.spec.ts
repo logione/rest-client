@@ -450,6 +450,24 @@ describe('fetch-stream specs', () => {
             controller.abort(reason)
             await expectAsync(getStream('http://localhost:5001/testabort', { signal: controller.signal })).toBeRejectedWith(reason)
         })
+
+        it('should reject with a TimeoutError when the timeout option expires', async () => {
+            const endless = new Readable({ read() {} })
+            let error: any
+            try {
+                await postStream('http://localhost:5001/testabort', endless, { timeout: 50 })
+            } catch (err) {
+                error = err
+            }
+            expect(error?.name).toBe('TimeoutError')
+            expect(endless.destroyed).toBeTrue()
+        })
+
+        it('should reject an invalid timeout without sending the request', async () => {
+            lastRequest = undefined
+            await expectAsync(getStream('http://localhost:5001/testget', { timeout: -1 })).toBeRejectedWithError(RangeError)
+            expect(lastRequest).toBeUndefined()
+        })
     })
 
     it('should send headers given as a Headers instance or as entries', async () => {

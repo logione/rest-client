@@ -5,12 +5,14 @@ import { RequestError } from './request-error.js'
 import { RequestOptions } from './request-options.js'
 import { appendSearchToURL } from './search.js'
 import { hasHeader, setHeader, toHeaderRecord } from './headers.js'
+import { getSignal } from './signal.js'
 
 export async function getStream(url: string, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+    const signal = getSignal(options)
     url = appendSearchToURL(url, options?.search)
-    const { protocol, httpRequestOptions } = getHTTPRequestOptions('GET', url, options)
+    const { protocol, httpRequestOptions } = getHTTPRequestOptions('GET', url, signal, options)
     const request = await importHttpRequest(protocol)
-    options?.signal?.throwIfAborted()
+    signal?.throwIfAborted()
     return new Promise<IncomingMessage>((resolve, reject) => {
         const req = request(httpRequestOptions, (response) => {
             if (!response.statusCode) {
@@ -22,7 +24,7 @@ export async function getStream(url: string, options?: RequestOptions<undefined>
             }
         })
         req.on('error', (err) => {
-            reject(abortReason(options?.signal) ?? err)
+            reject(abortReason(signal) ?? err)
         })
         req.end()
     })
@@ -37,14 +39,15 @@ export async function putStream(url: string, readableStream: NodeJS.ReadableStre
 }
 
 async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+    const signal = getSignal(options)
     url = appendSearchToURL(url, options?.search)
-    const { protocol, httpRequestOptions } = getHTTPRequestOptions(method, url, options)
+    const { protocol, httpRequestOptions } = getHTTPRequestOptions(method, url, signal, options)
     const request = await importHttpRequest(protocol)
-    options?.signal?.throwIfAborted()
+    signal?.throwIfAborted()
     const req = request(httpRequestOptions)
     const responsePromise = waitForResponse(req)
     const [upload, response] = await Promise.allSettled([pipeline(readableStream, req), responsePromise])
-    const aborted = abortReason(options?.signal)
+    const aborted = abortReason(signal)
     if (aborted !== undefined) {
         if (response.status === 'fulfilled') {
             response.value.destroy()
@@ -107,7 +110,7 @@ function getHeaders(incomingHttpHeaders: IncomingHttpHeaders): Headers {
     return headers
 }
 
-function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, options: RequestOptions<undefined> = {}): { protocol: string, httpRequestOptions: HTTPRequestOptions } {
+function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, signal: AbortSignal | undefined, options: RequestOptions<undefined> = {}): { protocol: string, httpRequestOptions: HTTPRequestOptions } {
     const urlParsed = new URL(url)
     // Copy so the defaults and token added below never leak into the caller's object.
     const headers = toHeaderRecord(options.headers)
@@ -124,7 +127,7 @@ function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, opti
         path: `${urlParsed.pathname}${urlParsed.search}`,
         method,
         headers,
-        signal: options.signal
+        signal
     }
     return { protocol: urlParsed.protocol, httpRequestOptions }
 }

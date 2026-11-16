@@ -191,6 +191,18 @@ function describeBrowser(browserType: BrowserType) {
             expect(name).toBe('TimeoutError')
         })
 
+        it('should abort a request with the timeout option', async () => {
+            const name = await page.evaluate(async (api) => {
+                try {
+                    await (window as any).lib.get(`${api}/slow`, { timeout: 50 })
+                    return null
+                } catch (err: any) {
+                    return err.name
+                }
+            }, API_ORIGIN)
+            expect(name).toBe('TimeoutError')
+        })
+
         it('should send cookies cross-origin only with credentials "include"', async () => {
             await page.context().addCookies([{ name: 'session', value: 'abc', domain: 'localhost', path: '/', sameSite: 'Lax' }])
             const [withoutCredentials, withCredentials] = await page.evaluate(async (api) => {

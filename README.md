@@ -147,18 +147,23 @@ await get('https://myapi/texts?page=1&limit=2&filter=noreply%40fake.ch')
 
 ### Cancellation and timeouts
 
-All functions accept an [`AbortSignal`](https://developer.mozilla.org/docs/Web/API/AbortSignal). Aborting rejects the request with an `AbortError` (or a `TimeoutError` for `AbortSignal.timeout()`). For streams, aborting after the response has started destroys the response stream.
+All functions accept a `timeout` in milliseconds and an [`AbortSignal`](https://developer.mozilla.org/docs/Web/API/AbortSignal). Aborting rejects the request with an `AbortError`, or a `TimeoutError` when the timeout expires. When both are set, whichever comes first aborts the request.
+
+The timeout covers the whole request, including reading the response body: for `getJSON` and the other JSON functions, until the body is parsed; for streams, aborting after the response has started destroys the response stream, so a long download is cut off even while data is still arriving.
 
 ```javascript
 import { getJSON } from '@logi.one/rest-client'
 
 // Give up after 5 seconds
-const data = await getJSON('https://myapi/slow', { signal: AbortSignal.timeout(5000) })
+const data = await getJSON('https://myapi/slow', { timeout: 5000 })
 
 // Or cancel it yourself
 const controller = new AbortController()
 const promise = getJSON('https://myapi/slow', { signal: controller.signal })
 controller.abort()
+
+// Both: cancel it yourself, or give up after 5 seconds
+await getJSON('https://myapi/slow', { signal: controller.signal, timeout: 5000 })
 ```
 
 ### Cookies and credentials (browser)

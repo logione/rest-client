@@ -18,8 +18,11 @@ describe('fetch specs', () => {
             req.on('data', (data) => {
                 body += data
             })
-            req.on('end', () => {
+            req.on('end', async () => {
                 lastRequestBody = body
+                if (req.url === '/testslow') {
+                    await new Promise((resolve) => setTimeout(resolve, 500))
+                }
                 res.writeHead(status)
                 if (responseBody) {
                     res.write(responseBody)
@@ -314,7 +317,7 @@ describe('fetch specs', () => {
         await post('http://localhost:5001/testpost', { body: webStream })
         expect(lastRequestBody).toBe('web stream')
 
-        await put('http://localhost:5001/testput', { body: Readable.from([Buffer.from('node '), Buffer.from('stream')]) as any })
+        await put('http://localhost:5001/testput', { body: Readable.from([Buffer.from('node '), Buffer.from('stream')]) })
         expect(lastRequestBody).toBe('node stream')
     })
 
@@ -336,6 +339,49 @@ describe('fetch specs', () => {
             responseBody = 'ok'
             const response = await get('http://localhost:5001/testabort', { signal: new AbortController().signal })
             expect(await response.text()).toBe('ok')
+        })
+    })
+
+    describe('timeout', () => {
+        it('should reject with a TimeoutError when the timeout expires', async () => {
+            try {
+                await get('http://localhost:5001/testslow', { timeout: 50 })
+                fail('should have timed out')
+            } catch (err: any) {
+                expect(err.name).toBe('TimeoutError')
+            }
+        })
+
+        it('should complete normally within the timeout', async () => {
+            status = 200
+            responseBody = 'ok'
+            const response = await get('http://localhost:5001/testget', { timeout: 5000 })
+            expect(await response.text()).toBe('ok')
+        })
+
+        it('should abort with the signal when it fires before the timeout', async () => {
+            const reason = new Error('custom reason')
+            const controller = new AbortController()
+            const promise = get('http://localhost:5001/testslow', { signal: controller.signal, timeout: 5000 })
+            controller.abort(reason)
+            await expectAsync(promise).toBeRejectedWith(reason)
+        })
+
+        it('should time out when a signal is also set but not aborted', async () => {
+            try {
+                await get('http://localhost:5001/testslow', { signal: new AbortController().signal, timeout: 50 })
+                fail('should have timed out')
+            } catch (err: any) {
+                expect(err.name).toBe('TimeoutError')
+            }
+        })
+
+        it('should reject an invalid timeout without sending the request', async () => {
+            lastRequest = undefined
+            for (const timeout of [-1, NaN, Infinity, '100' as any]) {
+                await expectAsync(get('http://localhost:5001/testget', { timeout })).withContext(String(timeout)).toBeRejectedWithError(RangeError)
+            }
+            expect(lastRequest).toBeUndefined()
         })
     })
 })

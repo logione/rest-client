@@ -44,7 +44,7 @@
     "build-watch": "tsc -w"
   },
   "engines": {
-    "node": ">=18.16.0"
+    "node": ">=20.3.0"
   },
   "author": "LogiONE Sàrl",
   "license": "ISC",

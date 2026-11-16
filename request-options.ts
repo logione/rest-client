@@ -8,6 +8,7 @@ export interface RequestOptions<T> {
     body?: T | undefined
     search?: Search
     signal?: AbortSignal
+    timeout?: number
     credentials?: 'omit' | 'same-origin' | 'include'
 }
 
