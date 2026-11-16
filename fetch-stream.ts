@@ -4,6 +4,7 @@ import { pipeline } from 'stream/promises'
 import { RequestError } from './request-error'
 import { RequestOptions } from './request-options'
 import { appendSearchToURL } from './search'
+import { hasHeader, setHeader } from './headers'
 
 export async function getStream(url: string, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
     url = appendSearchToURL(url, options?.search)
@@ -91,9 +92,11 @@ function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, opti
     const urlParsed = new URL(url)
     // Copy so the defaults and token added below never leak into the caller's object.
     const headers: Record<string, string> = { ...options.headers }
-    headers['User-Agent'] = headers['User-Agent'] || 'node'
+    if (!hasHeader(headers, 'User-Agent')) {
+        headers['User-Agent'] = 'node'
+    }
     if (options.token) {
-        headers.Authorization = `Bearer ${options.token}`
+        setHeader(headers, 'Authorization', `Bearer ${options.token}`)
     }
     const httpRequestOptions: HTTPRequestOptions = {
         hostname: urlParsed.hostname,

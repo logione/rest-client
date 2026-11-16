@@ -56,6 +56,15 @@ describe('fetch specs', () => {
         expect(lastRequest!.headers.authorization).toBeUndefined()
     })
 
+    it('should not duplicate headers given in another case', async () => {
+        await get('http://localhost:5001/testget', {
+            headers: { 'user-agent': 'my-agent', 'authorization': 'Basic old' },
+            token: 'fakeToken'
+        })
+        expect(lastRequest!.headers['user-agent']).toBe('my-agent')
+        expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+    })
+
     describe('POST', () => {
         it('should post data and parse json', async () => {
             status = 200

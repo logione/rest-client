@@ -1,4 +1,5 @@
 import { request } from './fetch'
+import { setHeader } from './headers'
 import { RequestOptions, RequestOptionsWithSchema } from './request-options'
 import { SchemaValidationError } from './schema-validation-error'
 import { StandardSchemaV1 } from './standard-schema.v1'
@@ -28,11 +29,12 @@ export function postJSON<T>(url: string, options?: RequestOptions<unknown>): Pro
 }
 
 async function requestJSON<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<unknown> | RequestOptionsWithSchema<unknown, any> = {}): Promise<T> {
-    const headers: Record<string, string> = { ...options.headers, Accept: 'application/json' }
+    const headers: Record<string, string> = { ...options.headers }
+    setHeader(headers, 'Accept', 'application/json')
     let body = options.body
 
     if (body !== undefined) {
-        headers['Content-Type'] = 'application/json'
+        setHeader(headers, 'Content-Type', 'application/json')
         if (typeof body !== 'string') {
             body = JSON.stringify(body)
         }

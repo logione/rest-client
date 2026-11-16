@@ -102,6 +102,16 @@ describe('fetch-json specs', () => {
         }
     })
 
+    it('should not duplicate headers given in another case', async () => {
+        await postJSON('http://localhost:5001/testpost', {
+            body: { fake: 'Data' },
+            headers: { 'accept': 'text/plain', 'content-type': 'text/plain', 'user-agent': 'my-agent' }
+        })
+        expect(lastRequest!.headers['accept']).toBe('application/json')
+        expect(lastRequest!.headers['content-type']).toBe('application/json')
+        expect(lastRequest!.headers['user-agent']).toBe('my-agent')
+    })
+
     describe('POST', () => {
         it('should post data and parse json', async () => {
             status = 200

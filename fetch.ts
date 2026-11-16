@@ -1,4 +1,5 @@
 import { appendSearchToURL } from './search'
+import { hasHeader, setHeader } from './headers'
 import { RequestError } from './request-error'
 import { RequestOptions } from './request-options'
 
@@ -20,7 +21,9 @@ export async function put(url: string, options?: RequestOptions<BodyInit>): Prom
 
 export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<BodyInit | undefined> = {}): Promise<Response> {
     const headers: Record<string, string> = { ...options.headers }
-    headers['User-Agent'] = headers['User-Agent'] || 'node'
+    if (!hasHeader(headers, 'User-Agent')) {
+        headers['User-Agent'] = 'node'
+    }
 
     const requestInit: RequestInit = {
         headers,
@@ -32,7 +35,7 @@ export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
     }
 
     if (options.token) {
-        headers.Authorization = `Bearer ${options.token}`
+        setHeader(headers, 'Authorization', `Bearer ${options.token}`)
     }
 
     url = appendSearchToURL(url, options.search)

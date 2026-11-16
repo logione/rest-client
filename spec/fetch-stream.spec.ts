@@ -66,6 +66,16 @@ describe('fetch-stream specs', () => {
         expect(lastRequest!.headers.authorization).toBeUndefined()
     })
 
+    it('should not override or duplicate headers given in another case', async () => {
+        status = 200
+        await streamToString(await getStream('http://localhost:5001/testgetstream', {
+            headers: { 'user-agent': 'my-agent', 'authorization': 'Basic old' },
+            token: 'fakeToken'
+        }))
+        expect(lastRequest!.headers['user-agent']).toBe('my-agent')
+        expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+    })
+
     describe('GET', () => {
         it('should get stream', async () => {
             status = 200
