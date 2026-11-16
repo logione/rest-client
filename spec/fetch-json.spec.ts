@@ -29,6 +29,7 @@ describe('fetch-json specs', () => {
     let lastRequestBody: unknown
     let responseBody: string
     let responseContentType: string
+    let forceContentType = false
     const schema = new TestStandardSchema() 
 
     beforeAll(async () => {
@@ -46,7 +47,9 @@ describe('fetch-json specs', () => {
                         lastRequestBody = body
                     }
                 }
-                if (typeof responseBody === 'string' && responseBody) {
+                if (forceContentType) {
+                    res.setHeader('Content-Type', responseContentType)
+                } else if (typeof responseBody === 'string' && responseBody) {
                     try {
                         JSON.parse(responseBody)
                         res.setHeader('Content-Type', responseContentType)
@@ -72,6 +75,7 @@ describe('fetch-json specs', () => {
         status = 204
         responseBody = ''
         responseContentType = 'application/json; charset=utf-8'
+        forceContentType = false
         lastRequestBody = undefined
     })
 
@@ -120,6 +124,46 @@ describe('fetch-json specs', () => {
             expect(lastRequestBody).withContext(String(body)).toBe(body)
             expect(lastRequest!.headers['content-type']).withContext(String(body)).toBe('application/json')
         }
+    })
+
+    it('should not send a null body with GET and DELETE', async () => {
+        await getJSON('http://localhost:5001/testget', { body: null } as any)
+        expect(lastRequest!.headers['content-type']).toBeUndefined()
+        await deleteJSON('http://localhost:5001/testdelete', { body: null } as any)
+        expect(lastRequestBody).toBe('')
+        expect(lastRequest!.headers['content-type']).toBeUndefined()
+    })
+
+    it('should not send an empty string body as JSON', async () => {
+        await postJSON('http://localhost:5001/testpost', { body: '' })
+        expect(lastRequestBody).toBe('')
+        expect(lastRequest!.headers['content-type']).toBeUndefined()
+    })
+
+    it('should keep JSON media types chosen by the caller', async () => {
+        await postJSON('http://localhost:5001/testpost', {
+            body: { fake: 'Data' },
+            headers: { 'content-type': 'application/merge-patch+json', 'Accept': 'application/vnd.api+json' }
+        })
+        expect(lastRequest!.headers['content-type']).toBe('application/merge-patch+json')
+        expect(lastRequest!.headers['accept']).toBe('application/vnd.api+json')
+        expect(lastRequestBody).toEqual({ fake: 'Data' })
+    })
+
+    it('should send headers given as a Headers instance', async () => {
+        await getJSON('http://localhost:5001/testget', { headers: new Headers({ 'x-custom': 'instance' }) })
+        expect(lastRequest!.headers['x-custom']).toBe('instance')
+        expect(lastRequest!.headers['accept']).toBe('application/json')
+    })
+
+    it('should return undefined for an empty JSON response', async () => {
+        status = 200
+        responseBody = ''
+        responseContentType = 'application/json'
+        forceContentType = true
+        expect(await deleteJSON('http://localhost:5001/testdelete')).toBeUndefined()
+        status = 204
+        expect(await getJSON('http://localhost:5001/testget')).toBeUndefined()
     })
 
     it('should not duplicate headers given in another case', async () => {

@@ -290,6 +290,18 @@ describe('fetch specs', () => {
         })
     })
 
+    it('should send headers given as a Headers instance or as entries without modifying them', async () => {
+        const instance = new Headers({ 'x-custom': 'instance' })
+        await get('http://localhost:5001/testget', { headers: instance, token: 'fakeToken' })
+        expect(lastRequest!.headers['x-custom']).toBe('instance')
+        expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+        expect([...instance.keys()]).toEqual(['x-custom'])
+
+        const entries: [string, string][] = [['x-custom', 'a'], ['X-Custom', 'b']]
+        await get('http://localhost:5001/testget', { headers: entries })
+        expect(lastRequest!.headers['x-custom']).toBe('a, b')
+    })
+
     describe('signal', () => {
         it('should reject with an AbortError and not send the request when the signal is already aborted', async () => {
             lastRequest = undefined

@@ -1,11 +1,10 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "outDir": "./dist/cjs"
+        "outDir": "./dist"
     },
     "exclude": [
         "spec",
-        "dist",
-        "browser.ts"
+        "dist"
     ]
 }

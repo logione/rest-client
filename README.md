@@ -22,7 +22,7 @@ The same import works in browsers: bundlers (Vite, webpack, esbuild, Rollup…) 
 import { getJSON } from '@logi.one/rest-client' // resolves to the browser build in a browser bundle
 ```
 
-The browser build is plain ES modules, so it can also be loaded without a bundler (from `dist/esm/browser.js`).
+The browser build is plain ES modules, so it can also be loaded without a bundler (from `dist/esm/browser.js`). Tools that `require()` the package with the `browser` condition, such as Jest with the jsdom environment, get a CommonJS copy of the same browser build.
 
 Differences from Node.js:
 
@@ -57,6 +57,14 @@ const headers = { 'X-Custom-Header': 'value' }
 response = await deleteJSON('https://myapi/addresses/1', { token, headers })
 console.log(response.message)
 ```
+
+In every function, `headers` can be a plain object, a `Headers` instance or an array of `[name, value]` pairs.
+
+Notes on JSON requests:
+
+- **Body**: objects and other values are serialized with `JSON.stringify`, and `Content-Type: application/json` is added. A string is sent as is (already serialized JSON), so an empty string sends no body. `null` is sent as JSON with `postJSON` and `putJSON`, and ignored with `getJSON` and `deleteJSON`.
+- **Content type**: `Accept` and `Content-Type` default to `application/json`. A JSON media type you set yourself is kept, such as `Content-Type: application/merge-patch+json` or `Accept: application/vnd.api+json`.
+- **Response**: JSON content types (`application/json` and `+json` types such as `application/problem+json`) are parsed. An empty JSON response, such as a `204 No Content`, returns `undefined`. Other content types are returned as text.
 
 ### JSON request with schema validation
 

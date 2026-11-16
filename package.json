@@ -2,20 +2,32 @@
   "name": "@logi.one/rest-client",
   "version": "0.6.0",
   "description": "This is a free, ultra-lightweight and easy to use rest client for Node.js and browsers supporting JSON requests and streams with no external dependencies.",
-  "main": "dist/cjs/index.js",
-  "types": "dist/cjs/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "browser": "./dist/esm/browser.js",
   "exports": {
     ".": {
       "browser": {
-        "types": "./dist/esm/browser.d.ts",
-        "default": "./dist/esm/browser.js"
+        "import": {
+          "types": "./dist/esm/browser.d.ts",
+          "default": "./dist/esm/browser.js"
+        },
+        "require": {
+          "types": "./dist/browser.d.ts",
+          "default": "./dist/browser.js"
+        },
+        "default": {
+          "types": "./dist/esm/browser.d.ts",
+          "default": "./dist/esm/browser.js"
+        }
       },
       "default": {
-        "types": "./dist/cjs/index.d.ts",
-        "default": "./dist/cjs/index.js"
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
       }
     },
+    "./dist/*.js": "./dist/*.js",
+    "./dist/*": "./dist/*.js",
     "./package.json": "./package.json"
   },
   "sideEffects": false,

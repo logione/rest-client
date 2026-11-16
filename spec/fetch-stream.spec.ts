@@ -393,5 +393,45 @@ describe('fetch-stream specs', () => {
             expect(error?.name).toBe('AbortError')
             expect(endless.destroyed).toBeTrue()
         })
+
+        it('should reject an upload with an AbortError and not send it when the signal is already aborted', async () => {
+            for (const upload of [postStream, putStream]) {
+                lastRequest = undefined
+                const stream = Readable.from(['beep'])
+                let error: any
+                try {
+                    await upload('http://localhost:5001/testabort', stream, { signal: AbortSignal.abort() })
+                } catch (err) {
+                    error = err
+                }
+                expect(error?.name).withContext(upload.name).toBe('AbortError')
+                expect(lastRequest).withContext(upload.name).toBeUndefined()
+            }
+        })
+
+        it('should reject with the signal reason, a TimeoutError for AbortSignal.timeout()', async () => {
+            const endless = new Readable({ read() {} })
+            endless.push('beep')
+            let error: any
+            try {
+                await postStream('http://localhost:5001/testabort', endless, { signal: AbortSignal.timeout(50) })
+            } catch (err) {
+                error = err
+            }
+            expect(error?.name).toBe('TimeoutError')
+
+            const reason = new Error('custom reason')
+            const controller = new AbortController()
+            controller.abort(reason)
+            await expectAsync(getStream('http://localhost:5001/testabort', { signal: controller.signal })).toBeRejectedWith(reason)
+        })
+    })
+
+    it('should send headers given as a Headers instance or as entries', async () => {
+        status = 200
+        await getStream('http://localhost:5001/testheaders', { headers: new Headers({ 'x-custom': 'instance' }) })
+        expect(lastRequest!.headers['x-custom']).toBe('instance')
+        await postStream('http://localhost:5001/testheaders', Readable.from(['beep']), { headers: [['x-custom', 'entries']] })
+        expect(lastRequest!.headers['x-custom']).toBe('entries')
     })
 })

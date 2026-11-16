@@ -4,12 +4,13 @@ import { pipeline } from 'stream/promises'
 import { RequestError } from './request-error.js'
 import { RequestOptions } from './request-options.js'
 import { appendSearchToURL } from './search.js'
-import { hasHeader, setHeader } from './headers.js'
+import { hasHeader, setHeader, toHeaderRecord } from './headers.js'
 
 export async function getStream(url: string, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
     url = appendSearchToURL(url, options?.search)
     const { protocol, httpRequestOptions } = getHTTPRequestOptions('GET', url, options)
     const request = await importHttpRequest(protocol)
+    options?.signal?.throwIfAborted()
     return new Promise<IncomingMessage>((resolve, reject) => {
         const req = request(httpRequestOptions, (response) => {
             if (!response.statusCode) {
@@ -21,7 +22,7 @@ export async function getStream(url: string, options?: RequestOptions<undefined>
             }
         })
         req.on('error', (err) => {
-            reject(err)
+            reject(abortReason(options?.signal) ?? err)
         })
         req.end()
     })
@@ -39,9 +40,17 @@ async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStre
     url = appendSearchToURL(url, options?.search)
     const { protocol, httpRequestOptions } = getHTTPRequestOptions(method, url, options)
     const request = await importHttpRequest(protocol)
+    options?.signal?.throwIfAborted()
     const req = request(httpRequestOptions)
     const responsePromise = waitForResponse(req)
     const [upload, response] = await Promise.allSettled([pipeline(readableStream, req), responsePromise])
+    const aborted = abortReason(options?.signal)
+    if (aborted !== undefined) {
+        if (response.status === 'fulfilled') {
+            response.value.destroy()
+        }
+        throw aborted
+    }
     if (response.status === 'rejected') {
         if (response.reason instanceof RequestError || upload.status === 'fulfilled') {
             throw response.reason
@@ -71,6 +80,10 @@ function waitForResponse(req: ClientRequest): Promise<IncomingMessage> {
     })
 }
 
+function abortReason(signal: AbortSignal | undefined): unknown {
+    return signal?.aborted ? signal.reason : undefined
+}
+
 function getHeaders(incomingHttpHeaders: IncomingHttpHeaders): Headers {
     const headers = new Headers()
     for (const key in incomingHttpHeaders) {
@@ -91,7 +104,7 @@ function getHeaders(incomingHttpHeaders: IncomingHttpHeaders): Headers {
 function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, options: RequestOptions<undefined> = {}): { protocol: string, httpRequestOptions: HTTPRequestOptions } {
     const urlParsed = new URL(url)
     // Copy so the defaults and token added below never leak into the caller's object.
-    const headers: Record<string, string> = { ...options.headers }
+    const headers = toHeaderRecord(options.headers)
     if (!hasHeader(headers, 'User-Agent')) {
         headers['User-Agent'] = 'node'
     }
