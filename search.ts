@@ -7,14 +7,18 @@ export function appendSearchToURL(url: string, search?: Search): string {
         return url
     }
 
-    if (url.includes('?')) {
-        if (!url.endsWith('&')) {
-            url += '&'
+    const hashIndex = url.indexOf('#')
+    const hash = hashIndex === -1 ? '' : url.slice(hashIndex)
+    let base = hashIndex === -1 ? url : url.slice(0, hashIndex)
+
+    if (base.includes('?')) {
+        if (!base.endsWith('&') && !base.endsWith('?')) {
+            base += '&'
         }
     } else {
-        url += '?'
+        base += '?'
     }
-    return url + params.toString()
+    return base + params.toString() + hash
 }
 
 function convertSearchToURLSearchParams(query?: Search) {
