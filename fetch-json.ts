@@ -28,16 +28,17 @@ export function postJSON<T>(url: string, options?: RequestOptions<unknown>): Pro
 }
 
 async function requestJSON<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<unknown> | RequestOptionsWithSchema<unknown, any> = {}): Promise<T> {
-    options.headers = options.headers || {}
-    options.headers.Accept = 'application/json'
+    // Work on copies so the caller's headers and body are never modified.
+    const headers: Record<string, string> = { ...options.headers, Accept: 'application/json' }
+    let body = options.body
 
-    if (options.body) {
-        options.headers['Content-Type'] = 'application/json'
-        if (typeof options.body !== 'string') {
-            options.body = JSON.stringify(options.body)
+    if (body) {
+        headers['Content-Type'] = 'application/json'
+        if (typeof body !== 'string') {
+            body = JSON.stringify(body)
         }
     }
-    const result = await request(method, url, options as RequestOptions<string>)
+    const result = await request(method, url, { ...options, headers, body } as RequestOptions<string>)
     const contentType = result.headers.get('content-type')
     let parsedResult
     if (contentType && contentType.startsWith('application/json')) {

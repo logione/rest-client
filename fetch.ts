@@ -19,7 +19,7 @@ export async function put(url: string, options?: RequestOptions<BodyInit>): Prom
 }
 
 export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<BodyInit | undefined> = {}): Promise<Response> {
-    const headers = options.headers || {}
+    const headers: Record<string, string> = { ...options.headers }
     headers['User-Agent'] = headers['User-Agent'] || 'node'
 
     const requestInit: RequestInit = {

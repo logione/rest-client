@@ -89,7 +89,8 @@ function getHeaders(incomingHttpHeaders: IncomingHttpHeaders): Headers {
 
 function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, options: RequestOptions<undefined> = {}): { protocol: string, httpRequestOptions: HTTPRequestOptions } {
     const urlParsed = new URL(url)
-    const headers = options.headers || {}
+    // Copy so the defaults and token added below never leak into the caller's object.
+    const headers: Record<string, string> = { ...options.headers }
     headers['User-Agent'] = headers['User-Agent'] || 'node'
     if (options.token) {
         headers.Authorization = `Bearer ${options.token}`

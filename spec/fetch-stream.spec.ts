@@ -55,6 +55,17 @@ describe('fetch-stream specs', () => {
         })
     })
 
+    it('should not modify the caller headers nor leak the token to later requests', async () => {
+        status = 200
+        const headers = { 'custom-header': 'OK' }
+        await streamToString(await getStream('http://localhost:5001/testgetstream', { headers, token: 'fakeToken' }))
+        expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+        expect(headers).toEqual({ 'custom-header': 'OK' })
+
+        await streamToString(await getStream('http://localhost:5001/testgetstream', { headers }))
+        expect(lastRequest!.headers.authorization).toBeUndefined()
+    })
+
     describe('GET', () => {
         it('should get stream', async () => {
             status = 200

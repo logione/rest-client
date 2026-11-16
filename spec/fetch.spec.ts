@@ -46,6 +46,16 @@ describe('fetch specs', () => {
         })
     })
 
+    it('should not modify the caller headers nor leak the token to later requests', async () => {
+        const headers = { 'custom-header': 'OK' }
+        await get('http://localhost:5001/testget', { headers, token: 'fakeToken' })
+        expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+        expect(headers).toEqual({ 'custom-header': 'OK' })
+
+        await get('http://localhost:5001/testget', { headers })
+        expect(lastRequest!.headers.authorization).toBeUndefined()
+    })
+
     describe('POST', () => {
         it('should post data and parse json', async () => {
             status = 200
