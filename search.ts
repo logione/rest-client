@@ -1,4 +1,4 @@
-type SearchValue = string | number | boolean
+type SearchValue = string | number | boolean | null | undefined
 export type Search = Record<string, SearchValue> | string | [string, string][] | URLSearchParams
 
 export function appendSearchToURL(url: string, search?: Search): string {
@@ -31,9 +31,9 @@ function convertSearchToURLSearchParams(query?: Search) {
     }
 
     const urlSearchParams = new URLSearchParams()
-    for (const key in query) {
-        if (query.hasOwnProperty(key)) {
-            urlSearchParams.append(key, query[key].toString())
+    for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined && value !== null) {
+            urlSearchParams.append(key, String(value))
         }
     }
     return urlSearchParams
