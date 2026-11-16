@@ -59,7 +59,7 @@ function hasJSONBody(method: 'GET' | 'POST' | 'PUT' | 'DELETE', body: unknown): 
     if (body === undefined || body === '') {
         return false
     }
-    return body !== null || method === 'POST' || method === 'PUT'
+    return method === 'POST' || method === 'PUT' || Boolean(body)
 }
 
 function isJSONContentType(contentType: string | null | undefined): boolean {

@@ -71,6 +71,12 @@ function waitForResponse(req: ClientRequest): Promise<IncomingMessage> {
                 reject(new Error('No status code'))
             } else if (response.statusCode < 200 || response.statusCode > 299) {
                 reject(new RequestError(response.statusMessage || '', response.statusCode, getHeaders(response.headers), response))
+                if (!req.writableFinished) {
+                    // The server refused the request: stop uploading the rest of the body.
+                    // Waiting a tick lets a short error body in the same packet be parsed, and closing the
+                    // socket rather than req (which dumps the response) keeps that body readable.
+                    setImmediate(() => req.socket?.destroy())
+                }
             } else {
                 resolve(response)
             }

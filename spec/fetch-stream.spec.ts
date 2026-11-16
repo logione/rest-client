@@ -142,7 +142,7 @@ describe('fetch-stream specs', () => {
             } catch (err) {
                 error = err
             }
-            expect(error.errno).toBe(-111)
+            expect(error.code).toBe('ECONNREFUSED')
         })
     })
 
@@ -218,7 +218,7 @@ describe('fetch-stream specs', () => {
             } catch (err) {
                 error = err
             }
-            expect(error.errno).toBe(-111)
+            expect(error.code).toBe('ECONNREFUSED')
         })
 
         describe('when the upload fails', () => {
@@ -234,6 +234,12 @@ describe('fetch-stream specs', () => {
             beforeAll(async () => {
                 // Rejects without reading the request body, then drops the connection.
                 earlyServer = createServer((req, res) => {
+                    if (req.url === '/keepalive') {
+                        // Rejects without reading the request body and keeps the connection open.
+                        res.writeHead(401)
+                        res.end('denied')
+                        return
+                    }
                     res.writeHead(413, { connection: 'close' })
                     res.end()
                     setTimeout(() => req.socket.destroy(), 20)
@@ -250,6 +256,25 @@ describe('fetch-stream specs', () => {
 
             afterEach(() => {
                 process.off('unhandledRejection', onUnhandled)
+            })
+
+            it('should stop uploading when the server rejects and keeps the connection open', async () => {
+                const start = Date.now()
+                let error: any
+                try {
+                    await postStream('http://localhost:5002/keepalive', bigStream())
+                } catch (err) {
+                    error = err
+                }
+                expect(Date.now() - start).toBeLessThan(1000)
+                expect(error instanceof RequestError).toBeTrue()
+                expect(error?.status).toBe(401)
+                let body = ''
+                for await (const chunk of error.response) {
+                    body += chunk
+                }
+                expect(body).toBe('denied')
+                expect(unhandled).toEqual([])
             })
 
             it('should throw the HTTP error when the server rejects before reading the body', async () => {
@@ -349,7 +374,7 @@ describe('fetch-stream specs', () => {
             } catch (err) {
                 error = err
             }
-            expect(error.errno).toBe(-111)
+            expect(error.code).toBe('ECONNREFUSED')
         })
     })
 

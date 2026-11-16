@@ -126,12 +126,14 @@ describe('fetch-json specs', () => {
         }
     })
 
-    it('should not send a null body with GET and DELETE', async () => {
-        await getJSON('http://localhost:5001/testget', { body: null } as any)
-        expect(lastRequest!.headers['content-type']).toBeUndefined()
-        await deleteJSON('http://localhost:5001/testdelete', { body: null } as any)
-        expect(lastRequestBody).toBe('')
-        expect(lastRequest!.headers['content-type']).toBeUndefined()
+    it('should not send a falsy body with GET and DELETE', async () => {
+        for (const body of [null, false, 0]) {
+            await getJSON('http://localhost:5001/testget', { body } as any)
+            expect(lastRequest!.headers['content-type']).withContext(String(body)).toBeUndefined()
+            await deleteJSON('http://localhost:5001/testdelete', { body } as any)
+            expect(lastRequestBody).withContext(String(body)).toBe('')
+            expect(lastRequest!.headers['content-type']).withContext(String(body)).toBeUndefined()
+        }
     })
 
     it('should not send an empty string body as JSON', async () => {

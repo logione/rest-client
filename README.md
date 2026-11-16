@@ -62,9 +62,9 @@ In every function, `headers` can be a plain object, a `Headers` instance or an a
 
 Notes on JSON requests:
 
-- **Body**: objects and other values are serialized with `JSON.stringify`, and `Content-Type: application/json` is added. A string is sent as is (already serialized JSON), so an empty string sends no body. `null` is sent as JSON with `postJSON` and `putJSON`, and ignored with `getJSON` and `deleteJSON`.
+- **Body**: objects and other values are serialized with `JSON.stringify`, and `Content-Type: application/json` is added. A string is sent as is (already serialized JSON), so an empty string sends no body. `null`, `false` and `0` are sent as JSON with `postJSON` and `putJSON`, and ignored with `getJSON` and `deleteJSON`.
 - **Content type**: `Accept` and `Content-Type` default to `application/json`. A JSON media type you set yourself is kept, such as `Content-Type: application/merge-patch+json` or `Accept: application/vnd.api+json`.
-- **Response**: JSON content types (`application/json` and `+json` types such as `application/problem+json`) are parsed. An empty JSON response, such as a `204 No Content`, returns `undefined`. Other content types are returned as text.
+- **Response**: JSON content types (`application/json` and `+json` types such as `application/problem+json`) are parsed. Other content types are returned as text.
 
 ### JSON request with schema validation
 
