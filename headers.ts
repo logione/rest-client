@@ -36,12 +36,7 @@ export function hasHeader(headers: Record<string, string>, name: string): boolea
 }
 
 export function setHeader(headers: Record<string, string>, name: string, value: string): void {
-    const lowerName = name.toLowerCase()
-    for (const key of Object.keys(headers)) {
-        if (key.toLowerCase() === lowerName) {
-            delete headers[key]
-        }
-    }
+    removeHeader(headers, name)
     headers[name] = value
 }
 
@@ -52,4 +47,13 @@ function isHeadersInstance(headers: HeadersOption): headers is Headers {
 function findHeaderName(headers: Record<string, string>, name: string): string | undefined {
     const lowerName = name.toLowerCase()
     return Object.keys(headers).find((key) => key.toLowerCase() === lowerName)
+}
+
+export function removeHeader(headers: Record<string, string>, name: string): void {
+    const lowerName = name.toLowerCase()
+    for (const key of Object.keys(headers)) {
+        if (key.toLowerCase() === lowerName) {
+            delete headers[key]
+        }
+    }
 }

@@ -5,7 +5,7 @@ import { RequestOptions } from './request-options.js'
 import { getSignal } from './signal.js'
 
 /** A fetch body, or in Node.js any async iterable such as a stream.Readable. */
-type Body = BodyInit | AsyncIterable<Uint8Array>
+export type RequestBody = BodyInit | AsyncIterable<Uint8Array>
 
 const isNode = typeof (globalThis as { process?: { versions?: { node?: unknown } } }).process?.versions?.node === 'string'
 
@@ -17,15 +17,15 @@ export async function del(url: string, options?: RequestOptions<undefined>): Pro
     return request('DELETE', url, options)
 }
 
-export async function post(url: string, options?: RequestOptions<Body>): Promise<Response> {
+export async function post(url: string, options?: RequestOptions<RequestBody>): Promise<Response> {
     return request('POST', url, options)
 }
 
-export async function put(url: string, options?: RequestOptions<Body>): Promise<Response> {
+export async function put(url: string, options?: RequestOptions<RequestBody>): Promise<Response> {
     return request('PUT', url, options)
 }
 
-export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<Body | undefined> = {}): Promise<Response> {
+export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<RequestBody | undefined> = {}): Promise<Response> {
     const headers = toHeaderRecord(options.headers)
     if (isNode && !hasHeader(headers, 'User-Agent')) {
         headers['User-Agent'] = 'node'

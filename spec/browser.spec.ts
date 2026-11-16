@@ -112,7 +112,7 @@ function describeBrowser(browserType: BrowserType) {
 
         it('should not export the Node.js stream functions', async () => {
             const exported = await page.evaluate(() => Object.keys((window as any).lib).sort())
-            expect(exported).toEqual(['RequestError', 'SchemaValidationError', 'del', 'deleteJSON', 'get', 'getJSON', 'post', 'postJSON', 'put', 'putJSON'])
+            expect(exported).toEqual(['RequestError', 'RestClient', 'SchemaValidationError', 'del', 'deleteJSON', 'get', 'getJSON', 'post', 'postJSON', 'put', 'putJSON'])
         })
 
         it('should getJSON cross-origin without a CORS preflight nor a "node" user agent', async () => {
@@ -131,6 +131,17 @@ function describeBrowser(browserType: BrowserType) {
             expect(post.method).toBe('POST')
             expect(post.headers.authorization).toBe('Bearer fakeToken')
             expect(post.headers['content-type']).toBe('application/json')
+        })
+
+        it('should send the RestClient defaults cross-origin', async () => {
+            const result = await page.evaluate(async (api) => {
+                const client = new (window as any).lib.RestClient({ baseUrl: `${api}/v1/`, token: 'fakeToken', credentials: 'include' })
+                client.setHeader('Content-Type', 'application/json')
+                return client.postJSON('/items', { body: { name: 'john' } })
+            }, API_ORIGIN)
+            expect(result.path).toBe('/v1/items')
+            expect(result.body).toBe('{"name":"john"}')
+            expect(apiRequests()[0].headers.authorization).toBe('Bearer fakeToken')
         })
 
         it('should throw a RequestError holding the fetch Response', async () => {

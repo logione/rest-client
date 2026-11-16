@@ -176,6 +176,34 @@ import { getJSON } from '@logi.one/rest-client'
 const me = await getJSON('https://api.example.com/me', { credentials: 'include' })
 ```
 
+### Client with defaults
+
+`RestClient` has the same methods as the functions (`getJSON`, `postJSON`, `putJSON`, `deleteJSON`, `get`, `post`, `put`, `del`, and in Node.js `getStream`, `postStream`, `putStream`) and sends its defaults with every request.
+
+```javascript
+import { RestClient } from '@logi.one/rest-client'
+
+const api = new RestClient({
+  baseUrl: 'https://myapi/v1',             // prepended to relative URLs
+  token: 'MyBearerToken',                  // Authorization: Bearer MyBearerToken
+  headers: { 'X-Custom-Header': 'value' },
+  timeout: 10000,
+  credentials: 'include'
+})
+
+const address = await api.getJSON('/addresses/1') // GET https://myapi/v1/addresses/1
+await api.postJSON('addresses', { body: { name: 'john' } })
+
+// The defaults can be changed at any time
+api.token = 'MyNewToken' // e.g. after a login or a token refresh
+api.timeout = undefined
+api.setHeader('Accept-Language', 'fr')
+api.removeHeader('X-Custom-Header')
+```
+
+- **URLs**: the base URL and a relative URL are joined with exactly one slash. Absolute URLs (`https://…`, `//host/…`) are used as is.
+- **Options of a request win over the defaults**: its `token`, `timeout` and `credentials` replace the defaults, and its headers replace the default headers of the same name (ignoring case). A request with its own `Authorization` header doesn't get the default token.
+
 ### Error handling
 
 ```javascript
