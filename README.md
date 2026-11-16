@@ -1,8 +1,8 @@
 # Rest Client by LogiONE
 
-This is a free, ultra-lightweight and easy-to-use http(s) client for node.js supporting JSON requests and streams with no external dependencies.
+This is a free, ultra-lightweight and easy-to-use http(s) client for Node.js supporting JSON requests and streams with no external dependencies.
 
-It uses the native node.js http and https modules and fetch to provide a simple interface for making http(s) requests.
+It uses the native Node.js http and https modules and fetch to provide a simple interface for making http(s) requests.
 
 **New: it supports [Standard Schema](https://standardschema.dev) validation. So, you can validate the data received from any API with your preferred library ([list of supported libraries](https://github.com/standard-schema/standard-schema/blob/main/packages/spec/README.md#what-schema-libraries-implement-the-spec)).**
 
@@ -37,11 +37,11 @@ console.log(response.name)
 // DELETE request with bearer token and custom headers
 const headers = { 'X-Custom-Header': 'value' }
 response = await deleteJSON('https://myapi/addresses/1', { token, headers })
-console.log(response.message) 
+console.log(response.message)
 ```
 
-### JSON request with schema validation 
- 
+### JSON request with schema validation
+
 ```javascript
 import { getJSON } from '@logi.one/rest-client'
 import { z } from 'zod' // Example with zod but other libraries can be used.
@@ -95,6 +95,7 @@ response = await post('https://myapi/texts', { body: text })
 console.log(response.headers.get('content-type'))
 
 // PUT request with bearer token
+const token = 'MyBearerToken'
 response = await put('https://myapi/texts/1', { body: text, token })
 console.log(response.status)
 
@@ -118,7 +119,7 @@ await get('https://myapi/texts?page=1&limit=2&filter=noreply%40fake.ch')
 
 ### Error handling
 
-```javascript	
+```javascript
 import { getJSON, getStream } from '@logi.one/rest-client'
 
 try {
@@ -139,7 +140,7 @@ try {
 } catch (error) { // throws an error if the request fails or the response status is not 2xx
   if (error.status) {
     console.log(error.response) // error.response is the original http IncomingMessage object
-    console.log(error.headers) // error.headers is formated has an Headers object
+    console.log(error.headers) // error.headers is formatted as a Headers object
     console.log(error.status) // error.status === error.response.statusCode
     console.log(error.message) // error.message === error.response.statusMessage
   } else {
