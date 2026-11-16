@@ -25,10 +25,10 @@
     "url": "https://github.com/logione/rest-client.git"
   },
   "devDependencies": {
-    "@types/jasmine": "^5.1.4",
-    "@types/node": "^22.7.2",
-    "typescript": "^5.3.2",
-    "jasmine": "^5.1.0"
+    "@types/jasmine": "^7.0.0",
+    "@types/node": "^26.6.6",
+    "jasmine": "^7.0.0",
+    "typescript": "^7.0.2"
   },
   "keywords": [
     "http",
