@@ -38,9 +38,25 @@ async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStre
     url = appendSearchToURL(url, options?.search)
     const { protocol, httpRequestOptions } = getHTTPRequestOptions(method, url, options)
     const request = await importHttpRequest(protocol)
-    let req: ClientRequest | undefined
-    const promise = new Promise<IncomingMessage>((resolve, reject) => {
-        req = request(httpRequestOptions, (response) => {
+    const req = request(httpRequestOptions)
+    const responsePromise = waitForResponse(req)
+    const [upload, response] = await Promise.allSettled([pipeline(readableStream, req), responsePromise])
+    if (response.status === 'rejected') {
+        if (response.reason instanceof RequestError || upload.status === 'fulfilled') {
+            throw response.reason
+        }
+        throw upload.reason
+    }
+    if (upload.status === 'rejected') {
+        response.value.destroy()
+        throw upload.reason
+    }
+    return response.value
+}
+
+function waitForResponse(req: ClientRequest): Promise<IncomingMessage> {
+    return new Promise<IncomingMessage>((resolve, reject) => {
+        req.once('response', (response) => {
             if (!response.statusCode) {
                 reject(new Error('No status code'))
             } else if (response.statusCode < 200 || response.statusCode > 299) {
@@ -49,9 +65,9 @@ async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStre
                 resolve(response)
             }
         })
+        req.once('error', reject)
+        req.once('close', () => reject(new Error('Request closed before a response was received')))
     })
-    await pipeline(readableStream, req!)
-    return promise
 }
 
 function getHeaders(incomingHttpHeaders: IncomingHttpHeaders): Headers {

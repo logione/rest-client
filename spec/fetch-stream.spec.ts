@@ -188,6 +188,67 @@ describe('fetch-stream specs', () => {
             }
             expect(error.errno).toBe(-111)
         })
+
+        describe('when the upload fails', () => {
+            let earlyServer: Server
+            let unhandled: unknown[]
+            const onUnhandled = (reason: unknown) => { unhandled.push(reason) }
+            const bigStream = () => Readable.from((function* () {
+                for (let i = 0; i < 2000; i++) {
+                    yield Buffer.alloc(64 * 1024)
+                }
+            })())
+
+            beforeAll(async () => {
+                // Rejects without reading the request body, then drops the connection.
+                earlyServer = createServer((req, res) => {
+                    res.writeHead(413, { connection: 'close' })
+                    res.end()
+                    setTimeout(() => req.socket.destroy(), 20)
+                })
+                await new Promise<void>((resolve) => earlyServer.listen(5002, undefined, resolve))
+            })
+
+            afterAll(() => new Promise<void>((resolve) => earlyServer.close(() => resolve())))
+
+            beforeEach(() => {
+                unhandled = []
+                process.on('unhandledRejection', onUnhandled)
+            })
+
+            afterEach(() => {
+                process.off('unhandledRejection', onUnhandled)
+            })
+
+            it('should throw the HTTP error when the server rejects before reading the body', async () => {
+                let error: any
+                try {
+                    await postStream('http://localhost:5002/toobig', bigStream())
+                } catch (err) {
+                    error = err
+                }
+                await new Promise((resolve) => setTimeout(resolve, 50))
+                expect(error instanceof RequestError).toBeTrue()
+                expect(error?.status).toBe(413)
+                expect(unhandled).toEqual([])
+            })
+
+            it('should throw the source stream error', async () => {
+                status = 200
+                const stream = new Readable({ read() {} })
+                stream.push('beep')
+                setTimeout(() => stream.destroy(new Error('source failed')), 20)
+                let error: any
+                try {
+                    await postStream('http://localhost:5001/testpoststream', stream)
+                } catch (err) {
+                    error = err
+                }
+                await new Promise((resolve) => setTimeout(resolve, 50))
+                expect(error?.message).toBe('source failed')
+                expect(unhandled).toEqual([])
+            })
+        })
     })
 
     describe('PUT', () => {
