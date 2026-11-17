@@ -74,7 +74,7 @@ export async function request(method: HttpMethod, url: string, options: RequestO
 }
 
 /** A web ReadableStream, or in Node.js any async iterable (such as a stream.Readable), which fetch also accepts. */
-function isStreamBody(body: unknown): boolean {
+export function isStreamBody(body: unknown): boolean {
     if (typeof ReadableStream !== 'undefined' && body instanceof ReadableStream) {
         return true
     }

@@ -1,6 +1,7 @@
-import { del, get, head, patch, post, put, RequestBody } from './fetch.js'
+import { del, get, head, isStreamBody, patch, post, put, RequestBody } from './fetch.js'
 import { deleteJSON, getJSON, patchJSON, postJSON, putJSON } from './fetch-json.js'
 import { getHeader, HeadersOption, hasHeader, removeHeader, setHeader, toHeaderRecord } from './headers.js'
+import { RequestError } from './request-error.js'
 import { RequestOptions, RequestOptionsWithSchema } from './request-options.js'
 import { StandardSchemaV1 } from './standard-schema.v1.js'
 
@@ -15,7 +16,22 @@ export interface RestClientOptions {
     timeout?: number
     /** Default fetch credentials mode. */
     credentials?: 'omit' | 'same-origin' | 'include'
+    /**
+     * Called when a request sent with the client credentials gets a 401 response, to renew them.
+     * Returns the new token (or true to send again as is) and the request is sent again, once.
+     */
+    onUnauthorized?: UnauthorizedHandler
 }
+
+/**
+ * Renews the credentials after a 401 response. Returns the new token, which becomes the client token,
+ * true to send the request again with the defaults as they are, or false to give up and throw the 401.
+ *
+ * `client` is a copy of the client defaults without onUnauthorized, for the requests of the renewal
+ * (such as the token refresh): a 401 there rejects at once. Requests sent with the token being renewed
+ * wait for one shared call.
+ */
+export type UnauthorizedHandler = (error: RequestError<unknown>, client: RestClient) => string | boolean | Promise<string | boolean>
 
 export interface RestClientRequestOptions<T> extends RequestOptions<T> {
     /** Sends the request without the client defaults (base URL, token, headers, timeout, credentials), as the plain functions do. */
@@ -57,14 +73,20 @@ export class RestClient implements IRestClient {
     token: string | undefined
     timeout: number | undefined
     credentials: 'omit' | 'same-origin' | 'include' | undefined
+    onUnauthorized: UnauthorizedHandler | undefined
 
     private readonly headers: Record<string, string>
+    /** The renewal in progress, for the token it renews. */
+    private renewal: { token: string | undefined, renewed: Promise<boolean> } | undefined
+    /** A token that onUnauthorized failed to renew, so its later 401s don't call it again. */
+    private unrenewable: { token: string | undefined } | undefined
 
     constructor(options: RestClientOptions = {}) {
         this.baseUrl = options.baseUrl
         this.token = options.token
         this.timeout = options.timeout
         this.credentials = options.credentials
+        this.onUnauthorized = options.onUnauthorized
         this.headers = toHeaderRecord(options.headers)
     }
 
@@ -86,60 +108,125 @@ export class RestClient implements IRestClient {
     getJSON<T extends StandardSchemaV1>(url: string, options: RestClientRequestOptionsWithSchema<undefined, T>): Promise<StandardSchemaV1.InferOutput<T>>
     getJSON<T>(url: string, options?: RestClientRequestOptions<undefined>): Promise<T>
     getJSON<T>(url: string, options?: RestClientRequestOptions<undefined>): Promise<T> {
-        const [target, merged] = this.prepare(url, options)
-        return getJSON<T>(target, merged)
+        return this.send(url, options, (target, merged) => getJSON<T>(target, merged))
     }
 
     deleteJSON<T extends StandardSchemaV1>(url: string, options: RestClientRequestOptionsWithSchema<undefined, T>): Promise<StandardSchemaV1.InferOutput<T>>
     deleteJSON<T>(url: string, options?: RestClientRequestOptions<undefined>): Promise<T>
     deleteJSON<T>(url: string, options?: RestClientRequestOptions<undefined>): Promise<T> {
-        const [target, merged] = this.prepare(url, options)
-        return deleteJSON<T>(target, merged)
+        return this.send(url, options, (target, merged) => deleteJSON<T>(target, merged))
     }
 
     postJSON<T extends StandardSchemaV1>(url: string, options: RestClientRequestOptionsWithSchema<unknown, T>): Promise<StandardSchemaV1.InferOutput<T>>
     postJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T>
     postJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T> {
-        const [target, merged] = this.prepare(url, options)
-        return postJSON<T>(target, merged)
+        return this.send(url, options, (target, merged) => postJSON<T>(target, merged))
     }
 
     putJSON<T extends StandardSchemaV1>(url: string, options: RestClientRequestOptionsWithSchema<unknown, T>): Promise<StandardSchemaV1.InferOutput<T>>
     putJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T>
     putJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T> {
-        const [target, merged] = this.prepare(url, options)
-        return putJSON<T>(target, merged)
+        return this.send(url, options, (target, merged) => putJSON<T>(target, merged))
     }
 
     patchJSON<T extends StandardSchemaV1>(url: string, options: RestClientRequestOptionsWithSchema<unknown, T>): Promise<StandardSchemaV1.InferOutput<T>>
     patchJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T>
     patchJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T> {
-        const [target, merged] = this.prepare(url, options)
-        return patchJSON<T>(target, merged)
+        return this.send(url, options, (target, merged) => patchJSON<T>(target, merged))
     }
 
     get(url: string, options?: RestClientRequestOptions<undefined>): Promise<Response> {
-        return get(...this.prepare(url, options))
+        return this.send(url, options, get)
     }
 
     del(url: string, options?: RestClientRequestOptions<undefined>): Promise<Response> {
-        return del(...this.prepare(url, options))
+        return this.send(url, options, del)
     }
 
     post(url: string, options?: RestClientRequestOptions<RequestBody>): Promise<Response> {
-        return post(...this.prepare(url, options))
+        return this.send(url, options, post, !isStreamBody(options?.body))
     }
 
     put(url: string, options?: RestClientRequestOptions<RequestBody>): Promise<Response> {
-        return put(...this.prepare(url, options))
+        return this.send(url, options, put, !isStreamBody(options?.body))
     }
 
     patch(url: string, options?: RestClientRequestOptions<RequestBody>): Promise<Response> {
-        return patch(...this.prepare(url, options))
+        return this.send(url, options, patch, !isStreamBody(options?.body))
     }
 
     head(url: string, options?: RestClientRequestOptions<undefined>): Promise<Response> {
-        return head(...this.prepare(url, options))
+        return this.send(url, options, head)
+    }
+
+    /**
+     * Sends a request with the client defaults. On a 401, renews the credentials with onUnauthorized and sends
+     * the request once more. `replayable` is false when the body is a stream, which can't be sent twice.
+     */
+    protected async send<T, R>(url: string, options: RestClientRequestOptions<T> | undefined, run: (url: string, options: RequestOptions<T>) => Promise<R>, replayable = true): Promise<R> {
+        const [target, merged] = this.prepare(url, options)
+        try {
+            return await run(target, merged)
+        } catch (err) {
+            if (!replayable || !(err instanceof RequestError) || err.status !== 401 || !this.usesClientCredentials(options)) {
+                throw err
+            }
+            if (!await this.renew(err, merged.token)) {
+                // The 401 body is kept for the caller.
+                throw err
+            }
+            this.discardBody(err.response)
+        }
+        return run(...this.prepare(url, options))
+    }
+
+    /** Resolves true when the request sent with `sentToken` should be sent again. */
+    private renew(error: RequestError<unknown>, sentToken: string | undefined): Promise<boolean> {
+        if (this.token !== sentToken) {
+            // Renewed since the request was sent.
+            return Promise.resolve(true)
+        }
+        if (this.renewal && this.renewal.token === sentToken) {
+            return this.renewal.renewed
+        }
+        if (!this.onUnauthorized || (this.unrenewable && this.unrenewable.token === sentToken)) {
+            return Promise.resolve(false)
+        }
+        const onUnauthorized = this.onUnauthorized
+        const renewal = {
+            token: sentToken,
+            renewed: (async () => {
+                const result = await onUnauthorized(error, this.copyWithoutOnUnauthorized())
+                if (typeof result === 'string') {
+                    this.token = result
+                }
+                if (result === false) {
+                    this.unrenewable = { token: sentToken }
+                    return false
+                }
+                this.unrenewable = undefined
+                return true
+            })()
+        }
+        this.renewal = renewal
+        const clear = () => {
+            if (this.renewal === renewal) {
+                this.renewal = undefined
+            }
+        }
+        renewal.renewed.then(clear, clear)
+        return renewal.renewed
+    }
+
+    /** A client with the same defaults, without onUnauthorized, for the requests sent by onUnauthorized. */
+    private copyWithoutOnUnauthorized(): RestClient {
+        const Client = this.constructor as new (options: RestClientOptions) => RestClient
+        return new Client({ baseUrl: this.baseUrl, token: this.token, headers: this.headers, timeout: this.timeout, credentials: this.credentials })
+    }
+
+    /** True when the request is sent with the client token or default Authorization header, not its own. */
+    private usesClientCredentials<T>(options: RestClientRequestOptions<T> | undefined): boolean {
+        return !options?.ignoreDefaults && options?.token === undefined && !hasHeader(toHeaderRecord(options?.headers), 'Authorization')
     }
 
     /** Returns the URL to request and a copy of the request options completed with the client defaults. */
@@ -182,5 +269,14 @@ export class RestClient implements IRestClient {
             merged.token = this.token
         }
         return merged
+    }
+
+    private discardBody(response: unknown): void {
+        if (typeof Response !== 'undefined' && response instanceof Response) {
+            response.body?.cancel().catch(() => {})
+        } else if (response && typeof (response as { resume?: unknown }).resume === 'function') {
+            // A Node.js IncomingMessage from the stream functions.
+            (response as { resume(): void }).resume()
+        }
     }
 }
