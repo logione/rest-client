@@ -28,7 +28,7 @@ Differences from Node.js:
 
 - **Stream functions (`getStream`, `postStream`, `putStream`, `patchStream`) are Node.js only** and are not exported by the browser build. In a browser, use `get` and read `response.body`, which is a web `ReadableStream`.
 - **No default `User-Agent` header.** In Node.js, requests send `User-Agent: node` unless you set one. Browsers set their own.
-- **CORS applies.** Cross-origin requests need the server to allow them. JSON requests with a body (`postJSON`, `putJSON`, `patchJSON`) send `Content-Type: application/json`, and `token` adds an `Authorization` header: both trigger a CORS preflight (`OPTIONS`) request, so the server must allow these headers.
+- **CORS applies.** Cross-origin requests need the server to allow them. A CORS preflight (`OPTIONS`) request is sent before any PUT, PATCH or DELETE request, with or without a body, since only GET, HEAD and POST can skip it. JSON requests with a body (`postJSON`, `putJSON`, `patchJSON`) send `Content-Type: application/json`, and `token` adds an `Authorization` header: both also trigger a preflight, so the server must allow these methods and headers.
 
 ## Usage
 
