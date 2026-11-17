@@ -282,7 +282,7 @@ export class RestClient implements IRestClient {
         if (typeof Response !== 'undefined' && response instanceof Response) {
             response.body?.cancel().catch(() => {})
         } else if (response && typeof (response as { resume?: unknown }).resume === 'function') {
-            // A Node.js IncomingMessage from the stream functions.
+            // A Node.js Readable (StreamResponse) from the stream functions.
             (response as { resume(): void }).resume()
         }
     }

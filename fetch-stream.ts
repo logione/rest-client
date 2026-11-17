@@ -1,142 +1,106 @@
-import { ClientRequest, IncomingMessage, RequestOptions as HTTPRequestOptions, IncomingHttpHeaders } from 'http'
-import { pipeline } from 'stream/promises'
+import { IncomingHttpHeaders } from 'http'
+import { Readable } from 'stream'
+import { ReadableStream as WebReadableStream } from 'stream/web'
 
+import { HttpMethod, request } from './fetch.js'
 import { RequestError } from './request-error.js'
 import { RequestOptions } from './request-options.js'
-import { appendSearchToURL } from './search.js'
-import { hasHeader, setHeader, toHeaderRecord } from './headers.js'
-import { getSignal } from './signal.js'
 
-export async function getStream(url: string, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
-    const signal = getSignal(options)
-    url = appendSearchToURL(url, options?.search)
-    const { protocol, httpRequestOptions } = getHTTPRequestOptions('GET', url, signal, options)
-    const request = await importHttpRequest(protocol)
-    signal?.throwIfAborted()
-    return new Promise<IncomingMessage>((resolve, reject) => {
-        const req = request(httpRequestOptions, (response) => {
-            if (!response.statusCode) {
-                reject(new Error('No status code'))
-            } else if (response.statusCode < 200 || response.statusCode > 299) {
-                reject(new RequestError(response.statusMessage || '', response.statusCode, getHeaders(response.headers), response))
-            } else {
-                resolve(response)
-            }
-        })
-        req.on('error', (err) => {
-            reject(abortReason(signal) ?? err)
-        })
-        req.end()
-    })
+/**
+ * The response of the stream functions: a Node.js Readable of the response body, with the status and
+ * headers as in an http IncomingMessage.
+ */
+export interface StreamResponse extends Readable {
+    statusCode: number
+    statusMessage: string
+    /** Lowercase header names, `set-cookie` as an array, other repeated headers joined with ", ". */
+    headers: IncomingHttpHeaders
 }
 
-export async function postStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+export async function getStream(url: string, options?: RequestOptions<undefined>): Promise<StreamResponse> {
+    try {
+        return toStreamResponse(await request('GET', url, options))
+    } catch (err) {
+        throw toStreamError(err)
+    }
+}
+
+export async function postStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<StreamResponse> {
     return uploadStream('POST', url, readableStream, options)
 }
 
-export async function putStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+export async function putStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<StreamResponse> {
     return uploadStream('PUT', url, readableStream, options)
 }
 
-export async function patchStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+export async function patchStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<StreamResponse> {
     return uploadStream('PATCH', url, readableStream, options)
 }
 
-async function uploadStream(method: 'POST' | 'PUT' | 'PATCH', url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
-    const signal = getSignal(options)
-    url = appendSearchToURL(url, options?.search)
-    const { protocol, httpRequestOptions } = getHTTPRequestOptions(method, url, signal, options)
-    const request = await importHttpRequest(protocol)
-    signal?.throwIfAborted()
-    const req = request(httpRequestOptions)
-    const responsePromise = waitForResponse(req)
-    const [upload, response] = await Promise.allSettled([pipeline(readableStream, req), responsePromise])
-    const aborted = abortReason(signal)
-    if (aborted !== undefined) {
-        if (response.status === 'fulfilled') {
-            response.value.destroy()
+async function uploadStream(method: HttpMethod, url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<StreamResponse> {
+    let sourceError: unknown
+    let stopped = false
+    // Reads the source through a generator to tell its errors apart from the request errors.
+    const body = (async function* () {
+        try {
+            yield* readableStream as AsyncIterable<Uint8Array>
+        } catch (err) {
+            if (!stopped) {
+                sourceError = err
+            }
+            throw err
         }
-        throw aborted
-    }
-    if (response.status === 'rejected') {
-        if (response.reason instanceof RequestError || upload.status === 'fulfilled') {
-            throw response.reason
+    })()
+    try {
+        // A redirect can't be followed: the stream body can't be sent twice. The 3xx is thrown as is.
+        return toStreamResponse(await request(method, url, { ...options, body }, 'manual'))
+    } catch (err) {
+        const error = sourceError ?? toStreamError(err)
+        // The server refused the request or it failed: stop reading the rest of the source.
+        stopped = true
+        if (typeof (readableStream as Partial<Readable>).destroy === 'function') {
+            (readableStream as Readable).destroy()
         }
-        throw upload.reason
+        throw error
     }
-    if (upload.status === 'rejected') {
-        response.value.destroy()
-        throw upload.reason
-    }
-    return response.value
 }
 
-function waitForResponse(req: ClientRequest): Promise<IncomingMessage> {
-    return new Promise<IncomingMessage>((resolve, reject) => {
-        req.once('response', (response) => {
-            if (!response.statusCode) {
-                reject(new Error('No status code'))
-            } else if (response.statusCode < 200 || response.statusCode > 299) {
-                reject(new RequestError(response.statusMessage || '', response.statusCode, getHeaders(response.headers), response))
-                if (!req.writableFinished) {
-                    // The server refused the request: stop uploading the rest of the body.
-                    // Waiting a tick lets a short error body in the same packet be parsed, and closing the
-                    // socket rather than req (which dumps the response) keeps that body readable.
-                    setImmediate(() => req.socket?.destroy())
-                }
-            } else {
-                resolve(response)
-            }
-        })
-        req.once('error', reject)
-        req.once('close', () => reject(new Error('Request closed before a response was received')))
+function toStreamResponse(response: Response): StreamResponse {
+    const stream = response.body ? Readable.fromWeb(response.body as WebReadableStream<Uint8Array>) : Readable.from([])
+    // Like an IncomingMessage, a response nobody reads must not crash the process with an unhandled
+    // 'error' when its connection drops. Readers still get the error: for await and pipeline reject.
+    stream.on('error', () => {})
+    return Object.assign(stream, {
+        statusCode: response.status,
+        statusMessage: response.statusText,
+        headers: toIncomingHeaders(response.headers)
     })
 }
 
-function abortReason(signal: AbortSignal | undefined): unknown {
-    return signal?.aborted ? signal.reason : undefined
+/**
+ * Gives a RequestError a StreamResponse, and keeps the errors the stream functions threw before
+ * they used fetch: the network error itself (ECONNREFUSED…) rather than fetch's "fetch failed".
+ */
+function toStreamError(err: unknown): unknown {
+    if (err instanceof RequestError && err.response instanceof Response) {
+        return new RequestError(err.message, err.status, err.headers, toStreamResponse(err.response))
+    }
+    if (err instanceof TypeError && err.message === 'fetch failed' && err.cause instanceof Error) {
+        return err.cause
+    }
+    return err
 }
 
-function getHeaders(incomingHttpHeaders: IncomingHttpHeaders): Headers {
-    const headers = new Headers()
-    for (const key in incomingHttpHeaders) {
-        if (incomingHttpHeaders.hasOwnProperty(key)) {
-            const value = incomingHttpHeaders[key]
-            if (Array.isArray(value)) {
-                for (const v of value) {
-                    headers.append(key, v)
-                }
-            } else {
-                headers.append(key, value ?? '')
-            }
+function toIncomingHeaders(headers: Headers): IncomingHttpHeaders {
+    const incoming: IncomingHttpHeaders = {}
+    headers.forEach((value, name) => {
+        if (name !== 'set-cookie') {
+            incoming[name] = value
         }
+    })
+    const cookies = headers.getSetCookie()
+    if (cookies.length > 0) {
+        incoming['set-cookie'] = cookies
     }
-    return headers
-}
-
-function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT' | 'PATCH', url: string, signal: AbortSignal | undefined, options: RequestOptions<undefined> = {}): { protocol: string, httpRequestOptions: HTTPRequestOptions } {
-    const urlParsed = new URL(url)
-    // Copy so the defaults and token added below never leak into the caller's object.
-    const headers = toHeaderRecord(options.headers)
-    if (!hasHeader(headers, 'User-Agent')) {
-        headers['User-Agent'] = 'node'
-    }
-    if (options.token) {
-        setHeader(headers, 'Authorization', `Bearer ${options.token}`)
-    }
-    const httpRequestOptions: HTTPRequestOptions = {
-        // URL keeps the brackets of IPv6 hosts ([::1]) but http.request expects them without.
-        hostname: urlParsed.hostname.replace(/^\[(.*)\]$/, '$1'),
-        port: urlParsed.port ? +urlParsed.port : (urlParsed.protocol === 'http:' ? 80 : 443),
-        path: `${urlParsed.pathname}${urlParsed.search}`,
-        method,
-        headers,
-        signal
-    }
-    return { protocol: urlParsed.protocol, httpRequestOptions }
-}
-
-async function importHttpRequest(protocol: string) {
-    const { request }= await (protocol === 'https:' ? import('https') : import('http'))
-    return request
+    return incoming
 }

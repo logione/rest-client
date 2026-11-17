@@ -1,5 +1,6 @@
 import { createServer, IncomingMessage, Server } from 'http'
 import { Readable, Stream } from 'stream'
+import { gzipSync } from 'zlib'
 
 import { getStream, patchStream, postStream, putStream } from '../fetch-stream'
 import { RequestError } from '../request-error'
@@ -105,7 +106,7 @@ describe('fetch-stream specs', () => {
             expect(lastRequest!.method).toBe('GET')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBeUndefined()
-            expect(lastRequest!.headers['accept']).toBeUndefined()
+            expect(lastRequest!.headers['accept']).toBe('*/*')
             expect(lastRequest!.headers['content-length']).toBeUndefined()
     
             await streamToString(await getStream('http://localhost:5001/testgetstream'))
@@ -165,7 +166,7 @@ describe('fetch-stream specs', () => {
             expect(lastRequest!.method).toBe('POST')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBeUndefined()
-            expect(lastRequest!.headers['accept']).toBeUndefined()
+            expect(lastRequest!.headers['accept']).toBe('*/*')
             expect(lastRequest!.headers['content-length']).toBeUndefined()
             expect(lastRequest!.headers['fake-header']).toBe('fake')
             expect(lastRequestBody).toBe('beep')
@@ -321,7 +322,7 @@ describe('fetch-stream specs', () => {
             expect(lastRequest!.method).toBe('PUT')
             expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
             expect(lastRequest!.headers['content-type']).toBeUndefined()
-            expect(lastRequest!.headers['accept']).toBeUndefined()
+            expect(lastRequest!.headers['accept']).toBe('*/*')
             expect(lastRequest!.headers['content-length']).toBeUndefined()
             expect(lastRequest!.headers['fake-header']).toBe('fake')
             expect(lastRequestBody).toBe('beep')
@@ -492,5 +493,140 @@ describe('fetch-stream specs', () => {
         expect(lastRequest!.headers['x-custom']).toBe('instance')
         await postStream('http://localhost:5001/testheaders', Readable.from(['beep']), { headers: [['x-custom', 'entries']] })
         expect(lastRequest!.headers['x-custom']).toBe('entries')
+    })
+})
+
+describe('fetch-stream response specs', () => {
+    const ORIGIN = 'http://localhost:5005'
+    let server: Server
+    let received: string[]
+
+    beforeAll(async () => {
+        server = createServer((req, res) => {
+            received.push(`${req.method} ${req.url}`)
+            if (req.url === '/reject') {
+                // Rejects without reading the request body and keeps the connection open.
+                res.writeHead(413, 'Payload Too Large', { 'Content-Type': 'application/json' }).end('{"error":"too big"}')
+                return
+            }
+            req.resume()
+            req.on('end', () => {
+                switch (req.url) {
+                    case '/cookies':
+                        res.writeHead(200, 'Fine', { 'Set-Cookie': ['a=1', 'b=2'], 'X-Item': '42' }).end('body')
+                        break
+                    case '/redirect':
+                        res.writeHead(307, { Location: '/target' }).end()
+                        break
+                    case '/target':
+                        res.end('target')
+                        break
+                    case '/gzip':
+                        res.writeHead(200, { 'Content-Encoding': 'gzip' }).end(gzipSync('unzipped'))
+                        break
+                    case '/missing':
+                        res.writeHead(404, 'Not Found').end('{"error":"missing"}')
+                        break
+                    case '/drop':
+                        res.writeHead(200).write('partial')
+                        setTimeout(() => req.socket.destroy(), 20)
+                        break
+                    default:
+                        res.end('ok')
+                }
+            })
+        })
+        await new Promise<void>((resolve) => server.listen(5005, undefined, resolve))
+    })
+
+    afterAll(() => new Promise<void>((resolve) => {
+        server.closeAllConnections()
+        server.close(() => resolve())
+    }))
+
+    beforeEach(() => {
+        received = []
+    })
+
+    const read = async (stream: Readable) => {
+        const chunks: Buffer[] = []
+        for await (const chunk of stream) {
+            chunks.push(Buffer.from(chunk))
+        }
+        return Buffer.concat(chunks).toString()
+    }
+
+    it('should return a Readable with the status and IncomingMessage-like headers', async () => {
+        const response = await getStream(`${ORIGIN}/cookies`)
+        expect(response instanceof Readable).toBeTrue()
+        expect(response.statusCode).toBe(200)
+        expect(response.statusMessage).toBe('Fine')
+        expect(response.headers['x-item']).toBe('42')
+        expect(response.headers['set-cookie']).toEqual(['a=1', 'b=2'])
+        expect(await read(response)).toBe('body')
+    })
+
+    it('should give stream errors a readable StreamResponse', async () => {
+        const error: RequestError<Readable & { statusCode: number }> = await getStream(`${ORIGIN}/missing`).catch((err) => err)
+        expect(error instanceof RequestError).toBeTrue()
+        expect(error.status).toBe(404)
+        expect(error.message).toBe('Not Found')
+        expect(error.response instanceof Readable).toBeTrue()
+        expect(error.response.statusCode).toBe(404)
+        expect(await read(error.response)).toBe('{"error":"missing"}')
+    })
+
+    it('should follow a redirect when getting a stream', async () => {
+        const response = await getStream(`${ORIGIN}/redirect`)
+        expect(response.statusCode).toBe(200)
+        expect(await read(response)).toBe('target')
+    })
+
+    it('should throw a redirect of a stream upload, which can\'t be sent twice', async () => {
+        const error: RequestError = await putStream(`${ORIGIN}/redirect`, Readable.from(['abc'])).catch((err) => err)
+        expect(error instanceof RequestError).toBeTrue()
+        expect(error.status).toBe(307)
+        expect(error.headers.get('location')).toBe('/target')
+        expect(received).toEqual(['PUT /redirect'])
+    })
+
+    it('should decompress a compressed response, as fetch does', async () => {
+        const response = await getStream(`${ORIGIN}/gzip`)
+        expect(response.headers['content-encoding']).toBe('gzip')
+        expect(await read(response)).toBe('unzipped')
+    })
+
+    it('should stop reading the source when the server rejects the upload', async () => {
+        const source = Readable.from((function* () {
+            for (let i = 0; i < 2000; i++) {
+                yield Buffer.alloc(64 * 1024)
+            }
+        })())
+        const error: RequestError<Readable> = await postStream(`${ORIGIN}/reject`, source).catch((err) => err)
+        expect(error.status).toBe(413)
+        expect(await read(error.response)).toBe('{"error":"too big"}')
+        expect(source.destroyed).toBeTrue()
+    })
+
+    it('should not crash when the connection of an unread response drops', async () => {
+        const uncaught: unknown[] = []
+        const onUncaught = (err: unknown) => { uncaught.push(err) }
+        // Jasmine reports uncaught exceptions itself: replace its handlers during the test.
+        const jasmineHandlers = process.listeners('uncaughtException')
+        process.removeAllListeners('uncaughtException')
+        process.on('uncaughtException', onUncaught)
+        try {
+            await getStream(`${ORIGIN}/drop`)
+            await new Promise((resolve) => setTimeout(resolve, 100))
+        } finally {
+            process.off('uncaughtException', onUncaught)
+            jasmineHandlers.forEach((handler) => process.on('uncaughtException', handler))
+        }
+        expect(uncaught).toEqual([])
+    })
+
+    it('should still give the error of a dropped connection to a reader', async () => {
+        const response = await getStream(`${ORIGIN}/drop`)
+        await expectAsync(read(response)).toBeRejected()
     })
 })

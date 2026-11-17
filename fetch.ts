@@ -34,7 +34,8 @@ export async function patch(url: string, options?: RequestOptions<RequestBody>):
     return request('PATCH', url, options)
 }
 
-export async function request(method: HttpMethod, url: string, options: RequestOptions<RequestBody | undefined> = {}): Promise<Response> {
+/** `redirect` 'manual' returns a 3xx response as is (a RequestError) instead of following it. */
+export async function request(method: HttpMethod, url: string, options: RequestOptions<RequestBody | undefined> = {}, redirect?: RequestRedirect): Promise<Response> {
     const headers = toHeaderRecord(options.headers)
     if (isNode && !hasHeader(headers, 'User-Agent')) {
         headers['User-Agent'] = 'node'
@@ -59,6 +60,9 @@ export async function request(method: HttpMethod, url: string, options: RequestO
     }
     if (options.credentials) {
         requestInit.credentials = options.credentials
+    }
+    if (redirect) {
+        requestInit.redirect = redirect
     }
 
     if (options.token) {

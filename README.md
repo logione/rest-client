@@ -102,7 +102,8 @@ import { createReadStream } from 'fs'
 
 // GET stream
 const token = 'MyBearerToken'
-const stream = await getStream('https://my-source-api/files/1', { token }) // stream is an http IncomingMessage object
+const stream = await getStream('https://my-source-api/files/1', { token }) // a Node.js Readable
+console.log(stream.statusCode, stream.headers['content-type']) // status and headers as in an http IncomingMessage
 
 // POST stream
 const headers = { 'X-Custom-Header': 'value' }
@@ -115,6 +116,12 @@ await putStream('https://myapi/files/1', readStream)
 // PATCH stream
 await patchStream('https://myapi/files/1', createReadStream('changes.txt'))
 ```
+
+The stream functions use fetch, like the other functions. They return a `StreamResponse`: a Node.js `Readable` of the response body with `statusCode`, `statusMessage` and `headers` (lowercase names, `set-cookie` as an array), so it can be piped or read with `for await` as before.
+
+- **Downloads follow redirects.** Uploads don't, since a stream can't be sent twice: a 3xx rejects with a `RequestError`.
+- **Compressed responses are decompressed**, as fetch does: a file served with `Content-Encoding: gzip` arrives decompressed, while the header still says gzip.
+- **When the server rejects an upload**, the source stream is destroyed so the rest isn't read.
 
 ### HTTP requests
 
@@ -272,8 +279,8 @@ try {
   await getStream('https://my-source-api/files/1')
 } catch (error) { // throws an error if the request fails or the response status is not 2xx
   if (error.status) {
-    console.log(error.response) // error.response is the original http IncomingMessage object
-    console.log(error.headers) // error.headers is formatted as a Headers object
+    console.log(error.response) // error.response is a StreamResponse, readable as a stream
+    console.log(error.headers) // error.headers is a fetch Headers object
     console.log(error.status) // error.status === error.response.statusCode
     console.log(error.message) // error.message === error.response.statusMessage
   } else {
@@ -281,5 +288,3 @@ try {
   }
 }
 ```
-
-With the stream functions, an error response left unread keeps its connection busy until the server closes it. If you don't read `error.response`, call `error.response.resume()` to drain it so the connection can be reused.
