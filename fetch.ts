@@ -78,8 +78,7 @@ export async function request(method: HttpMethod, url: string, options: RequestO
             result = await fetch(url, requestInit)
         } catch (err) {
             let delay: number | undefined
-            // A network error (fetch rejects with a TypeError), not an abort.
-            if (attempt < retry.limit && err instanceof TypeError && !signal?.aborted) {
+            if (attempt < retry.limit && isNetworkError(err) && !signal?.aborted) {
                 delay = getRetryDelay(retry, attempt)
             }
             if (delay === undefined) {
@@ -102,6 +101,18 @@ export async function request(method: HttpMethod, url: string, options: RequestO
         result.body?.cancel().catch(() => {})
         await wait(delay, signal)
     }
+}
+
+/**
+ * A network error worth retrying, not a mistake in the request (invalid URL or header, bad port), which would
+ * fail the same way every time. In Node.js, fetch gives network errors as "fetch failed" with a cause that has a
+ * code (ECONNREFUSED, ENOTFOUND, UND_ERR_SOCKET…). Browsers give the same TypeError for every network failure.
+ */
+function isNetworkError(err: unknown): boolean {
+    if (!(err instanceof TypeError)) {
+        return false
+    }
+    return !isNode || (err.message === 'fetch failed' && (err.cause as { code?: unknown } | undefined)?.code !== undefined)
 }
 
 /** A web ReadableStream, or in Node.js any async iterable (such as a stream.Readable), which fetch also accepts. */

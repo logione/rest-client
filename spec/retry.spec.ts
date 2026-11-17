@@ -102,6 +102,26 @@ describe('retry specs', () => {
         expect(await getJSON(target.url, { retry: { limit: 1, delay: 1 } })).toEqual({ attempts: 2 })
     })
 
+    it('should reject a mistake in the request at once, without retrying', async () => {
+        const retry = { limit: 5, delay: 1000 }
+        for (const [label, request] of [
+            ['invalid URL', () => get('not a url', { retry })],
+            ['bad port', () => get('http://localhost:1/', { retry })],
+            ['invalid header', () => get(`${ORIGIN}/status/503/0`, { retry, headers: { 'X-Bad\n': 'value' } })]
+        ] as const) {
+            const start = Date.now()
+            await expectAsync(request()).withContext(label).toBeRejectedWithError(TypeError)
+            expect(Date.now() - start).withContext(label).toBeLessThan(500)
+        }
+    })
+
+    it('should retry a refused connection', async () => {
+        const start = Date.now()
+        await expectAsync(get('http://localhost:65013/', { retry: { limit: 2, delay: 100 } })).toBeRejectedWithError(TypeError, 'fetch failed')
+        // Two waits of at least half the delay (50 ms, then 100 ms): it was retried twice.
+        expect(Date.now() - start).toBeGreaterThanOrEqual(150)
+    })
+
     it('should wait for the Retry-After seconds', async () => {
         const target = url('/retry-after/0.2/1')
         const start = Date.now()
