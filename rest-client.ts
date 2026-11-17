@@ -1,5 +1,5 @@
-import { del, get, post, put, RequestBody } from './fetch.js'
-import { deleteJSON, getJSON, postJSON, putJSON } from './fetch-json.js'
+import { del, get, head, patch, post, put, RequestBody } from './fetch.js'
+import { deleteJSON, getJSON, patchJSON, postJSON, putJSON } from './fetch-json.js'
 import { getHeader, HeadersOption, hasHeader, removeHeader, setHeader, toHeaderRecord } from './headers.js'
 import { RequestOptions, RequestOptionsWithSchema } from './request-options.js'
 import { StandardSchemaV1 } from './standard-schema.v1.js'
@@ -37,11 +37,15 @@ export interface IRestClient {
     postJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T>
     putJSON<T extends StandardSchemaV1>(url: string, options: RestClientRequestOptionsWithSchema<unknown, T>): Promise<StandardSchemaV1.InferOutput<T>>
     putJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T>
+    patchJSON<T extends StandardSchemaV1>(url: string, options: RestClientRequestOptionsWithSchema<unknown, T>): Promise<StandardSchemaV1.InferOutput<T>>
+    patchJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T>
 
     get(url: string, options?: RestClientRequestOptions<undefined>): Promise<Response>
     del(url: string, options?: RestClientRequestOptions<undefined>): Promise<Response>
     post(url: string, options?: RestClientRequestOptions<RequestBody>): Promise<Response>
     put(url: string, options?: RestClientRequestOptions<RequestBody>): Promise<Response>
+    patch(url: string, options?: RestClientRequestOptions<RequestBody>): Promise<Response>
+    head(url: string, options?: RestClientRequestOptions<undefined>): Promise<Response>
 }
 
 /**
@@ -107,6 +111,13 @@ export class RestClient implements IRestClient {
         return putJSON<T>(target, merged)
     }
 
+    patchJSON<T extends StandardSchemaV1>(url: string, options: RestClientRequestOptionsWithSchema<unknown, T>): Promise<StandardSchemaV1.InferOutput<T>>
+    patchJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T>
+    patchJSON<T>(url: string, options?: RestClientRequestOptions<unknown>): Promise<T> {
+        const [target, merged] = this.prepare(url, options)
+        return patchJSON<T>(target, merged)
+    }
+
     get(url: string, options?: RestClientRequestOptions<undefined>): Promise<Response> {
         return get(...this.prepare(url, options))
     }
@@ -121,6 +132,14 @@ export class RestClient implements IRestClient {
 
     put(url: string, options?: RestClientRequestOptions<RequestBody>): Promise<Response> {
         return put(...this.prepare(url, options))
+    }
+
+    patch(url: string, options?: RestClientRequestOptions<RequestBody>): Promise<Response> {
+        return patch(...this.prepare(url, options))
+    }
+
+    head(url: string, options?: RestClientRequestOptions<undefined>): Promise<Response> {
+        return head(...this.prepare(url, options))
     }
 
     /** Returns the URL to request and a copy of the request options completed with the client defaults. */

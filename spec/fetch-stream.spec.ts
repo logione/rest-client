@@ -1,7 +1,7 @@
 import { createServer, IncomingMessage, Server } from 'http'
 import { Readable, Stream } from 'stream'
 
-import { getStream, postStream, putStream } from '../fetch-stream'
+import { getStream, patchStream, postStream, putStream } from '../fetch-stream'
 import { RequestError } from '../request-error'
 
 describe('fetch-stream specs', () => {
@@ -375,6 +375,22 @@ describe('fetch-stream specs', () => {
                 error = err
             }
             expect(error.code).toBe('ECONNREFUSED')
+        })
+    })
+
+    describe('PATCH', () => {
+        it('should patch stream', async () => {
+            status = 200
+            await patchStream('http://localhost:5001/testpatchstream', Readable.from(['beep']), { token: 'fakeToken' })
+            expect(lastRequest!.url).toBe('/testpatchstream')
+            expect(lastRequest!.method).toBe('PATCH')
+            expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+            expect(lastRequestBody).toBe('beep')
+        })
+
+        it('should throw error if bigger than 299', async () => {
+            status = 409
+            await expectAsync(patchStream('http://localhost:5001/testpatchstream', Readable.from(['beep']))).toBeRejectedWith(jasmine.objectContaining({ status: 409 }))
         })
     })
 

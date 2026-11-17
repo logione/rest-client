@@ -112,7 +112,7 @@ function describeBrowser(browserType: BrowserType) {
 
         it('should not export the Node.js stream functions', async () => {
             const exported = await page.evaluate(() => Object.keys((window as any).lib).sort())
-            expect(exported).toEqual(['RequestError', 'RestClient', 'SchemaValidationError', 'del', 'deleteJSON', 'get', 'getJSON', 'post', 'postJSON', 'put', 'putJSON'])
+            expect(exported).toEqual(['RequestError', 'RestClient', 'SchemaValidationError', 'del', 'deleteJSON', 'get', 'getJSON', 'head', 'patch', 'patchJSON', 'post', 'postJSON', 'put', 'putJSON'])
         })
 
         it('should getJSON cross-origin without a CORS preflight nor a "node" user agent', async () => {

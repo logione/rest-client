@@ -26,16 +26,16 @@ The browser build is plain ES modules, so it can also be loaded without a bundle
 
 Differences from Node.js:
 
-- **Stream functions (`getStream`, `postStream`, `putStream`) are Node.js only** and are not exported by the browser build. In a browser, use `get` and read `response.body`, which is a web `ReadableStream`.
+- **Stream functions (`getStream`, `postStream`, `putStream`, `patchStream`) are Node.js only** and are not exported by the browser build. In a browser, use `get` and read `response.body`, which is a web `ReadableStream`.
 - **No default `User-Agent` header.** In Node.js, requests send `User-Agent: node` unless you set one. Browsers set their own.
-- **CORS applies.** Cross-origin requests need the server to allow them. JSON requests with a body (`postJSON`, `putJSON`) send `Content-Type: application/json`, and `token` adds an `Authorization` header: both trigger a CORS preflight (`OPTIONS`) request, so the server must allow these headers.
+- **CORS applies.** Cross-origin requests need the server to allow them. JSON requests with a body (`postJSON`, `putJSON`, `patchJSON`) send `Content-Type: application/json`, and `token` adds an `Authorization` header: both trigger a CORS preflight (`OPTIONS`) request, so the server must allow these headers.
 
 ## Usage
 
 ### JSON requests
 
 ```javascript
-import { getJSON, postJSON, putJSON, deleteJSON } from '@logi.one/rest-client'
+import { getJSON, postJSON, putJSON, patchJSON, deleteJSON } from '@logi.one/rest-client'
 
 // GET request
 let response = await getJSON('https://api.github.com/repos/logione/rest-client')
@@ -52,6 +52,13 @@ body.name = 'John'
 response = await putJSON('https://myapi/addresses/1', { body, token })
 console.log(response.name)
 
+// PATCH request with a JSON merge patch
+response = await patchJSON('https://myapi/addresses/1', {
+  body: { city: null },
+  token,
+  headers: { 'Content-Type': 'application/merge-patch+json' }
+})
+
 // DELETE request with bearer token and custom headers
 const headers = { 'X-Custom-Header': 'value' }
 response = await deleteJSON('https://myapi/addresses/1', { token, headers })
@@ -62,7 +69,7 @@ In every function, `headers` can be a plain object, a `Headers` instance or an a
 
 Notes on JSON requests:
 
-- **Body**: objects and other values are serialized with `JSON.stringify`, and `Content-Type: application/json` is added. A string is sent as is (already serialized JSON), so an empty string sends no body. `null`, `false` and `0` are sent as JSON with `postJSON` and `putJSON`, and ignored with `getJSON` and `deleteJSON`.
+- **Body**: objects and other values are serialized with `JSON.stringify`, and `Content-Type: application/json` is added. A string is sent as is (already serialized JSON), so an empty string sends no body. `null`, `false` and `0` are sent as JSON with `postJSON`, `putJSON` and `patchJSON`, and ignored with `getJSON` and `deleteJSON`.
 - **Content type**: `Accept` and `Content-Type` default to `application/json`. A JSON media type you set yourself is kept, such as `Content-Type: application/merge-patch+json` or `Accept: application/vnd.api+json`.
 - **Response**: JSON content types (`application/json` and `+json` types such as `application/problem+json`) are parsed. Other content types are returned as text.
 
@@ -90,7 +97,7 @@ try {
 ### Stream requests (Node.js only)
 
 ```javascript
-import { getStream, postStream, putStream } from '@logi.one/rest-client'
+import { getStream, postStream, putStream, patchStream } from '@logi.one/rest-client'
 import { createReadStream } from 'fs'
 
 // GET stream
@@ -104,12 +111,15 @@ await postStream('https://myapi/files', stream, { headers })
 // PUT stream
 const readStream = createReadStream('file.txt')
 await putStream('https://myapi/files/1', readStream)
+
+// PATCH stream
+await patchStream('https://myapi/files/1', createReadStream('changes.txt'))
 ```
 
 ### HTTP requests
 
 ```javascript
-import { get, post, put, del } from '@logi.one/rest-client'
+import { get, head, post, put, patch, del } from '@logi.one/rest-client'
 
 // GET request
 let response = await get('https://myapi/texts/1') // response is a fetch Response object
@@ -124,6 +134,13 @@ console.log(response.headers.get('content-type'))
 const token = 'MyBearerToken'
 response = await put('https://myapi/texts/1', { body: text, token })
 console.log(response.status)
+
+// PATCH request
+response = await patch('https://myapi/texts/1', { body: 'Hello', token })
+
+// HEAD request: the headers without the body
+response = await head('https://myapi/texts/1')
+console.log(response.headers.get('content-length'))
 
 // DELETE request with bearer token and custom headers
 const headers = { 'X-Custom-Header': 'value' }
@@ -178,7 +195,7 @@ const me = await getJSON('https://api.example.com/me', { credentials: 'include' 
 
 ### Client with defaults
 
-`RestClient` has the same methods as the functions (`getJSON`, `postJSON`, `putJSON`, `deleteJSON`, `get`, `post`, `put`, `del`, and in Node.js `getStream`, `postStream`, `putStream`) and sends its defaults with every request.
+`RestClient` has the same methods as the functions (`getJSON`, `postJSON`, `putJSON`, `patchJSON`, `deleteJSON`, `get`, `head`, `post`, `put`, `patch`, `del`, and in Node.js `getStream`, `postStream`, `putStream`, `patchStream`) and sends its defaults with every request.
 
 ```javascript
 import { RestClient } from '@logi.one/rest-client'

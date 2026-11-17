@@ -1,4 +1,4 @@
-import { request } from './fetch.js'
+import { HttpMethod, request } from './fetch.js'
 import { getHeader, setHeader, toHeaderRecord } from './headers.js'
 import { RequestOptions, RequestOptionsWithSchema } from './request-options.js'
 import { SchemaValidationError } from './schema-validation-error.js'
@@ -22,13 +22,19 @@ export function putJSON<T>(url: string, options?: RequestOptions<unknown>): Prom
     return requestJSON<T>('PUT', url, options)
 }
 
+export function patchJSON<T extends StandardSchemaV1>(url: string, options: RequestOptionsWithSchema<unknown, T>): Promise<StandardSchemaV1.InferOutput<T>>
+export function patchJSON<T>(url: string, options?: RequestOptions<unknown>): Promise<T>
+export function patchJSON<T>(url: string, options?: RequestOptions<unknown>): Promise<T> {
+    return requestJSON<T>('PATCH', url, options)
+}
+
 export function postJSON<T extends StandardSchemaV1>(url: string, options: RequestOptionsWithSchema<unknown, T>): Promise<StandardSchemaV1.InferOutput<T>>
 export function postJSON<T>(url: string, options?: RequestOptions<unknown>): Promise<T> 
 export function postJSON<T>(url: string, options?: RequestOptions<unknown>): Promise<T> {
     return requestJSON<T>('POST', url, options)
 }
 
-async function requestJSON<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<unknown> | RequestOptionsWithSchema<unknown, any> = {}): Promise<T> {
+async function requestJSON<T>(method: HttpMethod, url: string, options: RequestOptions<unknown> | RequestOptionsWithSchema<unknown, any> = {}): Promise<T> {
     const headers = toHeaderRecord(options.headers)
     if (!acceptsJSON(getHeader(headers, 'Accept'))) {
         setHeader(headers, 'Accept', 'application/json')
@@ -55,11 +61,11 @@ async function requestJSON<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: st
     return parsedResult
 }
 
-function hasJSONBody(method: 'GET' | 'POST' | 'PUT' | 'DELETE', body: unknown): boolean {
+function hasJSONBody(method: HttpMethod, body: unknown): boolean {
     if (body === undefined || body === '') {
         return false
     }
-    return method === 'POST' || method === 'PUT' || Boolean(body)
+    return method === 'POST' || method === 'PUT' || method === 'PATCH' || Boolean(body)
 }
 
 function isJSONContentType(contentType: string | null | undefined): boolean {

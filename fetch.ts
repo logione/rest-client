@@ -13,6 +13,10 @@ export async function get(url: string, options?: RequestOptions<undefined>): Pro
     return request('GET', url, options)
 }
 
+export async function head(url: string, options?: RequestOptions<undefined>): Promise<Response> {
+    return request('HEAD', url, options)
+}
+
 export async function del(url: string, options?: RequestOptions<undefined>): Promise<Response> {
     return request('DELETE', url, options)
 }
@@ -25,7 +29,13 @@ export async function put(url: string, options?: RequestOptions<RequestBody>): P
     return request('PUT', url, options)
 }
 
-export async function request(method: 'GET' | 'POST' | 'PUT' | 'DELETE', url: string, options: RequestOptions<RequestBody | undefined> = {}): Promise<Response> {
+export async function patch(url: string, options?: RequestOptions<RequestBody>): Promise<Response> {
+    return request('PATCH', url, options)
+}
+
+export type HttpMethod = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+export async function request(method: HttpMethod, url: string, options: RequestOptions<RequestBody | undefined> = {}): Promise<Response> {
     const headers = toHeaderRecord(options.headers)
     if (isNode && !hasHeader(headers, 'User-Agent')) {
         headers['User-Agent'] = 'node'

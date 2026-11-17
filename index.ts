@@ -1,5 +1,5 @@
-export { get, post, del, put } from './fetch.js'
-export type { RequestBody } from './fetch.js'
+export { get, head, post, put, patch, del } from './fetch.js'
+export type { HttpMethod, RequestBody } from './fetch.js'
 export type { HeadersOption } from './headers.js'
 export * from './fetch-json.js'
 export * from './fetch-stream.js'

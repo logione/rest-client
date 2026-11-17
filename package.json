@@ -68,6 +68,8 @@
     "get",
     "post",
     "put",
+    "patch",
+    "head",
     "delete",
     "rest",
     "curl",

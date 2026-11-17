@@ -257,8 +257,11 @@ describe('RestClient specs', () => {
             await client.post('f', { body: 'text' })
             await client.put('g', { body: 'text' })
             await client.del('h')
+            await client.patchJSON('i', { body: 3 })
+            await client.patch('j', { body: 'text' })
+            await client.head('k')
             expect(received.map((r) => `${r.method} ${r.url}`)).toEqual([
-                'GET /a', 'POST /b', 'PUT /c', 'DELETE /d', 'GET /e', 'POST /f', 'PUT /g', 'DELETE /h'
+                'GET /a', 'POST /b', 'PUT /c', 'DELETE /d', 'GET /e', 'POST /f', 'PUT /g', 'DELETE /h', 'PATCH /i', 'PATCH /j', 'HEAD /k'
             ])
         })
 
@@ -274,7 +277,7 @@ describe('RestClient specs', () => {
             await expectAsync(new RestClient({ baseUrl: ORIGIN }).getJSON('missing')).toBeRejectedWithError(RequestError, 'Not Found')
         })
 
-        it('should get, post and put streams with the defaults', async () => {
+        it('should get, post, put and patch streams with the defaults', async () => {
             const client = new RestClient({ baseUrl: ORIGIN, token: 'stream', headers: { 'X-App': 'test' } })
             const response = await client.getStream('s1')
             response.resume()
@@ -282,8 +285,10 @@ describe('RestClient specs', () => {
             upload.resume()
             const replace = await client.putStream('s3', Readable.from(['def']))
             replace.resume()
+            const update = await client.patchStream('s4', Readable.from(['ghi']))
+            update.resume()
             expect(received.map((r) => `${r.method} ${r.url} ${r.body} ${r.headers.authorization} ${r.headers['x-app']}`)).toEqual([
-                'GET /s1  Bearer stream test', 'POST /s2 abc Bearer stream test', 'PUT /s3 def Bearer stream test'
+                'GET /s1  Bearer stream test', 'POST /s2 abc Bearer stream test', 'PUT /s3 def Bearer stream test', 'PATCH /s4 ghi Bearer stream test'
             ])
         })
     })

@@ -1,7 +1,7 @@
 import { createServer, IncomingMessage, Server } from 'http'
 import { Readable } from 'stream'
 
-import { del, get, post, put } from '../fetch'
+import { del, get, head, patch, post, put } from '../fetch'
 import { RequestError } from '../request-error'
 
 describe('fetch specs', () => {
@@ -187,6 +187,42 @@ describe('fetch specs', () => {
                 error = err
             }
             expect(error.message).toBe('fetch failed')
+        })
+    })
+
+    describe('PATCH', () => {
+        it('should patch data', async () => {
+            status = 200
+            responseBody = 'DataUpdated'
+            const result = await patch('http://localhost:5001/testpatch', { body: 'Data', token: 'fakeToken' })
+            expect(lastRequestBody).toEqual('Data')
+            expect(await result.text()).toEqual('DataUpdated')
+            expect(lastRequest!.method).toBe('PATCH')
+            expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+            expect(lastRequest!.headers['content-length']).toBe('4')
+        })
+
+        it('should throw status if bigger than 299', async () => {
+            status = 409
+            await expectAsync(patch('http://localhost:5001/testpatch', { body: 'Data' })).toBeRejectedWith(jasmine.objectContaining({ status: 409 }))
+        })
+    })
+
+    describe('HEAD', () => {
+        it('should send a HEAD request without reading a body', async () => {
+            status = 200
+            responseBody = 'Ignored'
+            const result = await head('http://localhost:5001/testhead', { token: 'fakeToken', search: { id: 1 } })
+            expect(lastRequest!.method).toBe('HEAD')
+            expect(lastRequest!.url).toBe('/testhead?id=1')
+            expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+            expect(result.status).toBe(200)
+            expect(await result.text()).toBe('')
+        })
+
+        it('should throw status if bigger than 299', async () => {
+            status = 404
+            await expectAsync(head('http://localhost:5001/testhead')).toBeRejectedWith(jasmine.objectContaining({ status: 404 }))
         })
     })
 

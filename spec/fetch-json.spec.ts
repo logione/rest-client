@@ -1,6 +1,6 @@
 import { createServer, IncomingMessage, Server } from 'http'
 
-import { deleteJSON, getJSON, postJSON, putJSON } from '../fetch-json'
+import { deleteJSON, getJSON, patchJSON, postJSON, putJSON } from '../fetch-json'
 import { RequestError } from '../request-error'
 import { StandardSchemaV1 } from '../standard-schema.v1'
 import { SchemaValidationError } from '../schema-validation-error'
@@ -123,6 +123,9 @@ describe('fetch-json specs', () => {
             await postJSON('http://localhost:5001/testpost', { body })
             expect(lastRequestBody).withContext(String(body)).toBe(body)
             expect(lastRequest!.headers['content-type']).withContext(String(body)).toBe('application/json')
+            lastRequestBody = undefined
+            await patchJSON('http://localhost:5001/testpatch', { body })
+            expect(lastRequestBody).withContext(`PATCH ${body}`).toBe(body)
         }
     })
 
@@ -364,6 +367,38 @@ describe('fetch-json specs', () => {
                 error = err
             }
             expect(error.message).toBe('fetch failed')
+        })
+    })
+
+    describe('PATCH', () => {
+        it('should patch data and parse json', async () => {
+            status = 200
+            responseBody = JSON.stringify({ fake: 'DataUpdated' })
+            const result = await patchJSON<{ fake: string }>('http://localhost:5001/testpatch', { body: { fake: 'Data' }, token: 'fakeToken' })
+            expect(lastRequestBody).toEqual({ fake: 'Data' })
+            expect(result).toEqual({ fake: 'DataUpdated' })
+            expect(lastRequest!.method).toBe('PATCH')
+            expect(lastRequest!.headers.authorization).toBe('Bearer fakeToken')
+            expect(lastRequest!.headers['content-type']).toBe('application/json')
+            expect(lastRequest!.headers['accept']).toBe('application/json')
+        })
+
+        it('should keep a merge patch content type', async () => {
+            await patchJSON('http://localhost:5001/testpatch', { body: { fake: null }, headers: { 'Content-Type': 'application/merge-patch+json' } })
+            expect(lastRequest!.headers['content-type']).toBe('application/merge-patch+json')
+            expect(lastRequestBody).toEqual({ fake: null })
+        })
+
+        it('should validate schema if provided', async () => {
+            status = 200
+            responseBody = JSON.stringify({ value: '-250' })
+            const result = await patchJSON('http://localhost:5001/testpatch', { body: { fake: 'Data' }, schema })
+            expect(result).toEqual({ value: -250 })
+        })
+
+        it('should throw status if bigger than 299', async () => {
+            status = 422
+            await expectAsync(patchJSON('http://localhost:5001/testpatch', { body: { fake: 'Data' } })).toBeRejectedWith(jasmine.objectContaining({ status: 422 }))
         })
     })
 

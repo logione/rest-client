@@ -31,14 +31,18 @@ export async function getStream(url: string, options?: RequestOptions<undefined>
 }
 
 export async function postStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
-    return postOrPutStream('POST', url, readableStream, options)
+    return uploadStream('POST', url, readableStream, options)
 }
 
 export async function putStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
-    return postOrPutStream('PUT', url, readableStream, options)
+    return uploadStream('PUT', url, readableStream, options)
 }
 
-async function postOrPutStream(method: 'POST' | 'PUT', url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+export async function patchStream(url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
+    return uploadStream('PATCH', url, readableStream, options)
+}
+
+async function uploadStream(method: 'POST' | 'PUT' | 'PATCH', url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<IncomingMessage> {
     const signal = getSignal(options)
     url = appendSearchToURL(url, options?.search)
     const { protocol, httpRequestOptions } = getHTTPRequestOptions(method, url, signal, options)
@@ -110,7 +114,7 @@ function getHeaders(incomingHttpHeaders: IncomingHttpHeaders): Headers {
     return headers
 }
 
-function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT', url: string, signal: AbortSignal | undefined, options: RequestOptions<undefined> = {}): { protocol: string, httpRequestOptions: HTTPRequestOptions } {
+function getHTTPRequestOptions(method: 'GET' | 'POST' | 'PUT' | 'PATCH', url: string, signal: AbortSignal | undefined, options: RequestOptions<undefined> = {}): { protocol: string, httpRequestOptions: HTTPRequestOptions } {
     const urlParsed = new URL(url)
     // Copy so the defaults and token added below never leak into the caller's object.
     const headers = toHeaderRecord(options.headers)
