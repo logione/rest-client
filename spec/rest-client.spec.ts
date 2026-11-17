@@ -312,17 +312,47 @@ describe('RestClient specs', () => {
             expect(onUnauthorized).toHaveBeenCalledTimes(1)
             expect(methods()).toEqual(['POST /private Bearer old', 'POST /private Bearer fresh'])
             expect(received[1].body).toBe('{"a":1}')
+
+            await api.getJSON('private')
+            expect(methods()[2]).toBe('GET /private Bearer fresh')
+            expect(onUnauthorized).toHaveBeenCalledTimes(1)
         })
 
-        it('should send the request again as is when onUnauthorized returns true', async () => {
-            const api = new RestClient({ baseUrl: ORIGIN, token: 'old' })
-            api.onUnauthorized = () => {
-                api.setHeader('Authorization', 'Bearer fresh')
-                return true
+        it('should give up like false when onUnauthorized returns true or an empty string', async () => {
+            for (const result of [true, '']) {
+                const onUnauthorized = jasmine.createSpy('onUnauthorized').and.returnValue(result)
+                const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized })
+                const error: RequestError = await api.get('private').catch((err) => err)
+                expect(error.status).withContext(String(result)).toBe(401)
+                expect(await error.response.json()).withContext(String(result)).toEqual({ error: 'expired' })
+                await expectAsync(api.getJSON('private')).toBeRejectedWith(status401)
+                expect(onUnauthorized).withContext(String(result)).toHaveBeenCalledTimes(1)
+                expect(api.token).toBe('old')
             }
-            api.token = undefined
+            expect(received.length).toBe(4)
+        })
+
+        it('should not be called for a client without token, with only a default Authorization header', async () => {
+            const onUnauthorized = jasmine.createSpy('onUnauthorized').and.returnValue('fresh')
+            const api = new RestClient({ baseUrl: ORIGIN, headers: { Authorization: 'Bearer old' }, onUnauthorized })
+            await expectAsync(api.getJSON('private')).toBeRejectedWith(status401)
+            expect(onUnauthorized).not.toHaveBeenCalled()
+            expect(received.length).toBe(1)
+        })
+
+        it('should not apply the changes made on the client given to onUnauthorized', async () => {
+            const api = new RestClient({ baseUrl: ORIGIN, token: 'old', headers: { 'X-App': 'test' }, onUnauthorized: (_, client) => {
+                client.token = 'ignored'
+                client.setHeader('X-Renewed', 'yes')
+                client.removeHeader('X-App')
+                return 'fresh'
+            } })
             await api.getJSON('private')
-            expect(methods()).toEqual(['GET /private undefined', 'GET /private Bearer fresh'])
+            expect(api.token).toBe('fresh')
+            expect(api.getHeader('X-Renewed')).toBeUndefined()
+            expect(api.getHeader('X-App')).toBe('test')
+            expect(last().headers['x-renewed']).toBeUndefined()
+            expect(last().headers['x-app']).toBe('test')
         })
 
         describe('a 401 that arrives after the renewal', () => {
@@ -333,105 +363,17 @@ describe('RestClient specs', () => {
                 expect(onUnauthorized).toHaveBeenCalledTimes(1)
             })
 
-            it('should send again without renewing a default Authorization header twice', async () => {
-                const onUnauthorized = jasmine.createSpy('onUnauthorized').and.callFake((_, client: RestClient) => {
-                    client.setHeader('Authorization', 'Bearer fresh')
-                    return true
-                })
-                const api = new RestClient({ baseUrl: ORIGIN, headers: { Authorization: 'Bearer old' }, onUnauthorized })
-                await Promise.all([api.getJSON('private'), api.getJSON('private/slow')])
-                expect(onUnauthorized).toHaveBeenCalledTimes(1)
-                expect(methods().sort()).toEqual([
-                    'GET /private Bearer fresh', 'GET /private Bearer old', 'GET /private/slow Bearer fresh', 'GET /private/slow Bearer old'
-                ])
-            })
-
-            it('should not call onUnauthorized again for a default Authorization header it failed to renew', async () => {
+            it('should not call onUnauthorized again for a token it failed to renew', async () => {
                 const onUnauthorized = jasmine.createSpy('onUnauthorized').and.returnValue(false)
-                const api = new RestClient({ baseUrl: ORIGIN, headers: { Authorization: 'Bearer old' }, onUnauthorized })
+                const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized })
                 const results = await Promise.allSettled([api.getJSON('private'), api.getJSON('private/slow')])
                 expect(results.map((r) => r.status)).toEqual(['rejected', 'rejected'])
                 expect(onUnauthorized).toHaveBeenCalledTimes(1)
-                api.setHeader('Authorization', 'Bearer other') // e.g. after a new login
-                await expectAsync(api.getJSON('private')).toBeRejectedWith(status401)
-                expect(onUnauthorized).toHaveBeenCalledTimes(2)
-            })
-        })
-
-        describe('changes made on the client given to onUnauthorized', () => {
-            it('should apply a token set on it', async () => {
-                const onUnauthorized = jasmine.createSpy('onUnauthorized').and.callFake((_, client: RestClient) => {
-                    client.token = 'fresh'
-                    return true
-                })
-                const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized })
-                await api.getJSON('private')
-                await api.getJSON('private')
-                expect(api.token).toBe('fresh')
-                expect(onUnauthorized).toHaveBeenCalledTimes(1)
-                expect(methods()).toEqual(['GET /private Bearer old', 'GET /private Bearer fresh', 'GET /private Bearer fresh'])
-            })
-
-            it('should apply headers set or removed on it', async () => {
-                const api = new RestClient({
-                    baseUrl: ORIGIN,
-                    headers: { Authorization: 'Bearer old', 'X-Session': 'expired' },
-                    onUnauthorized: (_, client) => {
-                        client.setHeader('authorization', 'Bearer fresh')
-                        client.removeHeader('x-session')
-                        return true
-                    }
-                })
-                await api.getJSON('private')
-                expect(api.getHeader('Authorization')).toBe('Bearer fresh')
-                expect(api.getHeader('X-Session')).toBeUndefined()
-                expect(methods()).toEqual(['GET /private Bearer old', 'GET /private Bearer fresh'])
-                expect(last().headers['x-session']).toBeUndefined()
-            })
-
-            it('should keep the defaults changed on the client meanwhile that it did not change', async () => {
-                const api: RestClient = new RestClient({
-                    baseUrl: ORIGIN,
-                    token: 'old',
-                    headers: { 'Accept-Language': 'en' },
-                    onUnauthorized: (_, client) => {
-                        api.setHeader('Accept-Language', 'fr')
-                        api.setHeader('X-Added', 'yes')
-                        client.token = 'fresh'
-                        return true
-                    }
-                })
-                await api.getJSON('private')
-                expect(api.getHeader('Accept-Language')).toBe('fr')
-                expect(api.getHeader('X-Added')).toBe('yes')
-                expect(api.token).toBe('fresh')
-            })
-
-            it('should prefer the returned token', async () => {
-                const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized: (_, client) => {
-                    client.token = 'ignored'
-                    client.setHeader('X-Renewed', 'yes')
-                    return 'fresh'
-                } })
-                await api.getJSON('private')
-                expect(api.token).toBe('fresh')
-                expect(last().headers['x-renewed']).toBe('yes')
-            })
-
-            it('should discard them when onUnauthorized returns false', async () => {
-                const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized: (_, client) => {
-                    client.token = 'fresh'
-                    client.setHeader('X-Renewed', 'yes')
-                    return false
-                } })
-                await expectAsync(api.getJSON('private')).toBeRejectedWith(status401)
-                expect(api.token).toBe('old')
-                expect(api.getHeader('X-Renewed')).toBeUndefined()
             })
         })
 
         it('should throw the 401 with its body when onUnauthorized returns false or is not set', async () => {
-            const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized: async () => false })
+            const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized: async () => false as const })
             const error: RequestError = await api.get('private').catch((err) => err)
             expect(error.status).toBe(401)
             expect(await error.response.json()).toEqual({ error: 'expired' })
@@ -454,7 +396,8 @@ describe('RestClient specs', () => {
         })
 
         it('should send the request again only once', async () => {
-            const onUnauthorized = jasmine.createSpy('onUnauthorized').and.resolveTo(true)
+            // The server only accepts "fresh": the retry gets a 401 too.
+            const onUnauthorized = jasmine.createSpy('onUnauthorized').and.resolveTo('still-invalid')
             const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized })
             await expectAsync(api.getJSON('private')).toBeRejectedWith(status401)
             expect(onUnauthorized).toHaveBeenCalledTimes(1)

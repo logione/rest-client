@@ -227,7 +227,7 @@ await api.put(presignedUrl, { body: file, ignoreDefaults: true })
 
 ### Renewing an expired token
 
-`onUnauthorized` is called when a request sent with the client credentials gets a 401 response. Return the new token: it becomes the client token and the request is sent again, once. Return `true` to send it again with the defaults as they are, for example after `client.setHeader('Authorization', …)`: the token and headers changed on `client` are applied to the client. Return `false` to give up: the request then rejects with the 401 `RequestError`, whose body can still be read. If `onUnauthorized` throws, the request rejects with that error.
+`onUnauthorized` is called when a request sent with the client token gets a 401 response. Return the new token: it becomes the client token and the request is sent again with it, once. Return `false` to give up: the request then rejects with the 401 `RequestError`, whose body can still be read. If `onUnauthorized` throws, the request rejects with that error.
 
 ```javascript
 let refreshToken = 'myRefreshToken'
@@ -245,10 +245,10 @@ const api = new RestClient({
 })
 ```
 
-- **Send the renewal requests with the `client` argument**, not with `api`. It is a copy of the client defaults without `onUnauthorized`, so a 401 there rejects at once. A request through `api` with the expired token would wait for the renewal it is part of, forever.
+- **Send the renewal requests with the `client` argument**, not with `api`. It is a copy of the client defaults without `onUnauthorized`, so a 401 there rejects at once. A request through `api` with the expired token would wait for the renewal it is part of, forever. Changes made on `client` (its token or headers) aren't applied to `api`: the returned token is the only result.
 - **One renewal per token.** Every request sent with the token being renewed waits for the same call, including requests started during the renewal, so a rotating refresh token is only used once. A request that gets a 401 after the token already changed is sent again without calling `onUnauthorized`.
 - **A token that couldn't be renewed isn't renewed again.** After `onUnauthorized` returns `false`, the later 401s of that token reject without calling it, so it can prompt for a new login only once. Setting a new `api.token` (after the login) enables it again. A thrown error isn't remembered: the next 401 calls `onUnauthorized` again.
-- **Not called** for requests with their own `token` or `Authorization` header, with `ignoreDefaults`, or with a stream body (`postStream`, `putStream`, `patchStream`, or `post`, `put`, `patch` with a stream), since a stream can't be sent twice. `getStream` is retried.
+- **Not called** when the client has no token, for requests with their own `token` or `Authorization` header, with `ignoreDefaults`, or with a stream body (`postStream`, `putStream`, `patchStream`, or `post`, `put`, `patch` with a stream), since a stream can't be sent twice. `getStream` is retried.
 
 ### Error handling
 
