@@ -6,6 +6,7 @@ import { getSignal } from './signal.js'
 
 /** A fetch body, or in Node.js any async iterable such as a stream.Readable. */
 export type RequestBody = BodyInit | AsyncIterable<Uint8Array>
+export type HttpMethod = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 const isNode = typeof (globalThis as { process?: { versions?: { node?: unknown } } }).process?.versions?.node === 'string'
 
@@ -32,8 +33,6 @@ export async function put(url: string, options?: RequestOptions<RequestBody>): P
 export async function patch(url: string, options?: RequestOptions<RequestBody>): Promise<Response> {
     return request('PATCH', url, options)
 }
-
-export type HttpMethod = 'GET' | 'HEAD' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export async function request(method: HttpMethod, url: string, options: RequestOptions<RequestBody | undefined> = {}): Promise<Response> {
     const headers = toHeaderRecord(options.headers)
