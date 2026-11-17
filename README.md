@@ -227,10 +227,10 @@ await api.put(presignedUrl, { body: file, ignoreDefaults: true })
 
 ### Renewing an expired token
 
-`onUnauthorized` is called when a request sent with the client credentials gets a 401 response. Return the new token: it becomes the client token and the request is sent again, once. Return `true` to send it again with the defaults as they are (for example after `setHeader('Authorization', …)`), or `false` to give up: the request then rejects with the 401 `RequestError`, whose body can still be read. If `onUnauthorized` throws, the request rejects with that error.
+`onUnauthorized` is called when a request sent with the client credentials gets a 401 response. Return the new token: it becomes the client token and the request is sent again, once. Return `true` to send it again with the defaults as they are, for example after `client.setHeader('Authorization', …)`: the token and headers changed on `client` are applied to the client. Return `false` to give up: the request then rejects with the 401 `RequestError`, whose body can still be read. If `onUnauthorized` throws, the request rejects with that error.
 
 ```javascript
-let resfreshToken = 'myRefreshToken'
+let refreshToken = 'myRefreshToken'
 const api = new RestClient({
   baseUrl: 'https://myapi/v1',
   token: accessToken,

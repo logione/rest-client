@@ -196,13 +196,16 @@ export class RestClient implements IRestClient {
         const renewal = {
             token: sentToken,
             renewed: (async () => {
-                const result = await onUnauthorized(error, this.copyWithoutOnUnauthorized())
-                if (typeof result === 'string') {
-                    this.token = result
-                }
+                const copy = this.copyWithoutOnUnauthorized()
+                const copiedHeaders = { ...copy.headers }
+                const result = await onUnauthorized(error, copy)
                 if (result === false) {
                     this.unrenewable = { token: sentToken }
                     return false
+                }
+                this.applyChanges(copy, sentToken, copiedHeaders)
+                if (typeof result === 'string') {
+                    this.token = result
                 }
                 this.unrenewable = undefined
                 return true
@@ -222,6 +225,26 @@ export class RestClient implements IRestClient {
     private copyWithoutOnUnauthorized(): RestClient {
         const Client = this.constructor as new (options: RestClientOptions) => RestClient
         return new Client({ baseUrl: this.baseUrl, token: this.token, headers: this.headers, timeout: this.timeout, credentials: this.credentials })
+    }
+
+    /**
+     * Applies the token and headers that onUnauthorized changed on the copy (from `token` and `headers`),
+     * leaving the defaults it didn't change as they are now.
+     */
+    private applyChanges(copy: RestClient, token: string | undefined, headers: Record<string, string>): void {
+        if (copy.token !== token) {
+            this.token = copy.token
+        }
+        for (const [name, value] of Object.entries(copy.headers)) {
+            if (getHeader(headers, name) !== value) {
+                setHeader(this.headers, name, value)
+            }
+        }
+        for (const name of Object.keys(headers)) {
+            if (!hasHeader(copy.headers, name)) {
+                removeHeader(this.headers, name)
+            }
+        }
     }
 
     /** True when the request is sent with the client token or default Authorization header, not its own. */

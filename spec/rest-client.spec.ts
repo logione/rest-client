@@ -324,6 +324,78 @@ describe('RestClient specs', () => {
             expect(methods()).toEqual(['GET /private undefined', 'GET /private Bearer fresh'])
         })
 
+        describe('changes made on the client given to onUnauthorized', () => {
+            it('should apply a token set on it', async () => {
+                const onUnauthorized = jasmine.createSpy('onUnauthorized').and.callFake((_, client: RestClient) => {
+                    client.token = 'fresh'
+                    return true
+                })
+                const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized })
+                await api.getJSON('private')
+                await api.getJSON('private')
+                expect(api.token).toBe('fresh')
+                expect(onUnauthorized).toHaveBeenCalledTimes(1)
+                expect(methods()).toEqual(['GET /private Bearer old', 'GET /private Bearer fresh', 'GET /private Bearer fresh'])
+            })
+
+            it('should apply headers set or removed on it', async () => {
+                const api = new RestClient({
+                    baseUrl: ORIGIN,
+                    headers: { Authorization: 'Bearer old', 'X-Session': 'expired' },
+                    onUnauthorized: (_, client) => {
+                        client.setHeader('authorization', 'Bearer fresh')
+                        client.removeHeader('x-session')
+                        return true
+                    }
+                })
+                await api.getJSON('private')
+                expect(api.getHeader('Authorization')).toBe('Bearer fresh')
+                expect(api.getHeader('X-Session')).toBeUndefined()
+                expect(methods()).toEqual(['GET /private Bearer old', 'GET /private Bearer fresh'])
+                expect(last().headers['x-session']).toBeUndefined()
+            })
+
+            it('should keep the defaults changed on the client meanwhile that it did not change', async () => {
+                const api: RestClient = new RestClient({
+                    baseUrl: ORIGIN,
+                    token: 'old',
+                    headers: { 'Accept-Language': 'en' },
+                    onUnauthorized: (_, client) => {
+                        api.setHeader('Accept-Language', 'fr')
+                        api.setHeader('X-Added', 'yes')
+                        client.token = 'fresh'
+                        return true
+                    }
+                })
+                await api.getJSON('private')
+                expect(api.getHeader('Accept-Language')).toBe('fr')
+                expect(api.getHeader('X-Added')).toBe('yes')
+                expect(api.token).toBe('fresh')
+            })
+
+            it('should prefer the returned token', async () => {
+                const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized: (_, client) => {
+                    client.token = 'ignored'
+                    client.setHeader('X-Renewed', 'yes')
+                    return 'fresh'
+                } })
+                await api.getJSON('private')
+                expect(api.token).toBe('fresh')
+                expect(last().headers['x-renewed']).toBe('yes')
+            })
+
+            it('should discard them when onUnauthorized returns false', async () => {
+                const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized: (_, client) => {
+                    client.token = 'fresh'
+                    client.setHeader('X-Renewed', 'yes')
+                    return false
+                } })
+                await expectAsync(api.getJSON('private')).toBeRejectedWith(status401)
+                expect(api.token).toBe('old')
+                expect(api.getHeader('X-Renewed')).toBeUndefined()
+            })
+        })
+
         it('should throw the 401 with its body when onUnauthorized returns false or is not set', async () => {
             const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized: async () => false })
             const error: RequestError = await api.get('private').catch((err) => err)
