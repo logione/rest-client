@@ -3,6 +3,7 @@ import { deleteJSON, getJSON, patchJSON, postJSON, putJSON } from './fetch-json.
 import { getHeader, HeadersOption, hasHeader, removeHeader, setHeader, toHeaderRecord } from './headers.js'
 import { RequestError } from './request-error.js'
 import { RequestOptions, RequestOptionsWithSchema } from './request-options.js'
+import { RetryOptions } from './retry.js'
 import { StandardSchemaV1 } from './standard-schema.v1.js'
 
 export interface RestClientOptions {
@@ -14,6 +15,8 @@ export interface RestClientOptions {
     headers?: HeadersOption
     /** Default timeout in milliseconds. `null` or `Infinity` in a request means no timeout. */
     timeout?: number
+    /** Default retry option: the number of retries, or the retry options. `retry: 0` in a request disables it. */
+    retry?: number | RetryOptions
     /** Default fetch credentials mode. */
     credentials?: 'omit' | 'same-origin' | 'include'
     /**
@@ -36,12 +39,12 @@ export interface RestClientOptions {
 export type UnauthorizedHandler = (error: RequestError<unknown>, client: RestClient) => string | false | Promise<string | false>
 
 export interface RestClientRequestOptions<T> extends RequestOptions<T> {
-    /** Sends the request without the client defaults (base URL, token, headers, timeout, credentials), as the plain functions do. */
+    /** Sends the request without the client defaults (base URL, token, headers, timeout, retry, credentials), as the plain functions do. */
     ignoreDefaults?: boolean
 }
 
 export interface RestClientRequestOptionsWithSchema<T, S extends StandardSchemaV1> extends RequestOptionsWithSchema<T, S> {
-    /** Sends the request without the client defaults (base URL, token, headers, timeout, credentials), as the plain functions do. */
+    /** Sends the request without the client defaults (base URL, token, headers, timeout, retry, credentials), as the plain functions do. */
     ignoreDefaults?: boolean
 }
 
@@ -67,13 +70,14 @@ export interface IRestClient {
 }
 
 /**
- * A client that sends its defaults (base URL, token, headers, timeout, credentials) with every request.
+ * A client that sends its defaults (base URL, token, headers, timeout, retry, credentials) with every request.
  * The defaults can be changed at any time; headers through setHeader and removeHeader.
  */
 export class RestClient implements IRestClient {
     baseUrl: string | undefined
     token: string | undefined
     timeout: number | undefined
+    retry: number | RetryOptions | undefined
     credentials: 'omit' | 'same-origin' | 'include' | undefined
     onUnauthorized: UnauthorizedHandler | undefined
 
@@ -87,6 +91,7 @@ export class RestClient implements IRestClient {
         this.baseUrl = options.baseUrl
         this.token = options.token
         this.timeout = options.timeout
+        this.retry = options.retry
         this.credentials = options.credentials
         this.onUnauthorized = options.onUnauthorized
         this.headers = toHeaderRecord(options.headers)
@@ -222,7 +227,7 @@ export class RestClient implements IRestClient {
     /** A client with the same defaults, without onUnauthorized, for the requests sent by onUnauthorized. */
     private copyWithoutOnUnauthorized(): RestClient {
         const Client = this.constructor as new (options: RestClientOptions) => RestClient
-        return new Client({ baseUrl: this.baseUrl, token: this.token, headers: this.headers, timeout: this.timeout, credentials: this.credentials })
+        return new Client({ baseUrl: this.baseUrl, token: this.token, headers: this.headers, timeout: this.timeout, retry: this.retry, credentials: this.credentials })
     }
 
     /**
@@ -267,6 +272,10 @@ export class RestClient implements IRestClient {
         const timeout = options.timeout !== undefined ? options.timeout : this.timeout
         if (timeout !== undefined) {
             merged.timeout = timeout
+        }
+        const retry = options.retry !== undefined ? options.retry : this.retry
+        if (retry !== undefined) {
+            merged.retry = retry
         }
         const credentials = options.credentials ?? this.credentials
         if (credentials !== undefined) {

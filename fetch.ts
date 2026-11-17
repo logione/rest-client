@@ -2,6 +2,7 @@ import { appendSearchToURL } from './search.js'
 import { hasHeader, setHeader, toHeaderRecord } from './headers.js'
 import { RequestError } from './request-error.js'
 import { RequestOptions } from './request-options.js'
+import { getRetry, getRetryDelay, wait } from './retry.js'
 import { getSignal } from './signal.js'
 
 /** A fetch body, or in Node.js any async iterable such as a stream.Readable. */
@@ -70,11 +71,37 @@ export async function request(method: HttpMethod, url: string, options: RequestO
     }
 
     url = appendSearchToURL(url, options.search)
-    const result = await fetch(url, requestInit)
-    if (!result.ok) {
-        throw new RequestError(result.statusText, result.status, result.headers, result)
+    const retry = getRetry(isStreamBody(options.body) ? undefined : options.retry, method)
+    for (let attempt = 0; ; attempt++) {
+        let result: Response
+        try {
+            result = await fetch(url, requestInit)
+        } catch (err) {
+            let delay: number | undefined
+            // A network error (fetch rejects with a TypeError), not an abort.
+            if (attempt < retry.limit && err instanceof TypeError && !signal?.aborted) {
+                delay = getRetryDelay(retry, attempt)
+            }
+            if (delay === undefined) {
+                throw err
+            }
+            await wait(delay, signal)
+            continue
+        }
+        if (result.ok) {
+            return result
+        }
+        let delay: number | undefined
+        if (attempt < retry.limit && retry.statusCodes.includes(result.status)) {
+            delay = getRetryDelay(retry, attempt, result)
+        }
+        if (delay === undefined) {
+            throw new RequestError(result.statusText, result.status, result.headers, result)
+        }
+        // Frees the connection of the response that is given up.
+        result.body?.cancel().catch(() => {})
+        await wait(delay, signal)
     }
-    return result
 }
 
 /** A web ReadableStream, or in Node.js any async iterable (such as a stream.Readable), which fetch also accepts. */

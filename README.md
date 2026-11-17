@@ -32,7 +32,7 @@ const address = await response.json()
 const address = await postJSON('https://myapi/addresses', { body: { name: 'john' }, token })
 ```
 
-`postJSON` also handles what the fetch version doesn't: an empty response, a response that isn't JSON, a `timeout`, `search` parameters, and an optional `schema` to validate the result.
+`postJSON` also handles what the fetch version doesn't: an empty response, a response that isn't JSON, a `timeout`, `search` parameters, optional retries, and an optional `schema` to validate the result.
 
 ### Two ways to use it
 
@@ -237,6 +237,34 @@ controller.abort()
 await getJSON('https://myapi/slow', { signal: controller.signal, timeout: 5000 })
 ```
 
+### Retries
+
+With `retry`, a request is sent again after a network error or a 408, 429, 500, 502, 503 or 504 response. It is off by default.
+
+```javascript
+import { getJSON } from '@logi.one/rest-client'
+
+// Up to 2 retries
+const data = await getJSON('https://myapi/items', { retry: 2 })
+
+// With options
+await getJSON('https://myapi/items', {
+  retry: {
+    limit: 3,                // retries after the first attempt
+    methods: ['GET', 'POST'], // default: GET, HEAD, PUT, DELETE
+    statusCodes: [503],      // default: 408, 429, 500, 502, 503, 504
+    delay: 500,              // first wait in milliseconds, doubled at each retry (default: 300)
+    maxDelay: 10000          // longest wait (default: 30000)
+  }
+})
+```
+
+- **Only methods that are safe to send twice** are retried by default: GET, HEAD, PUT and DELETE. A POST or PATCH that timed out may have been processed, so add them to `methods` only if the API handles duplicates.
+- **The wait** doubles at each retry, with some randomness so that clients don't all retry at once. A `Retry-After` header (seconds or a date) is used instead when the server sends one. If it asks for longer than `maxDelay`, the request gives up at once.
+- **The `timeout` covers all the attempts**, and the waits between them. Aborting the `signal` stops the waits at once.
+- **A stream body is never retried**, since it can't be sent twice. `getStream` is retried.
+- **After the last attempt**, the request rejects with the last error, as without retries.
+
 ### Cookies and credentials (browser)
 
 In a browser, cross-origin requests don't send cookies by default. Set `credentials: 'include'` to send them (the server must answer with `Access-Control-Allow-Credentials: true` and an explicit `Access-Control-Allow-Origin`). It is the fetch [`credentials`](https://developer.mozilla.org/docs/Web/API/RequestInit#credentials) option: `'omit'`, `'same-origin'` (default) or `'include'`.
@@ -261,6 +289,7 @@ const api = new RestClient({
   token: 'MyBearerToken',                  // Authorization: Bearer MyBearerToken
   headers: { 'X-Custom-Header': 'value' },
   timeout: 10000,
+  retry: 2,
   credentials: 'include'
 })
 
@@ -278,8 +307,8 @@ await api.put(presignedUrl, { body: file, ignoreDefaults: true })
 ```
 
 - **URLs**: the base URL and a relative URL are joined with exactly one slash, so `https://myapi/v1/` or `https://myapi/v1` with `/items` or `items` all give `https://myapi/v1/items`. `http://…`, `https://…` and `//host/…` URLs are used as is (`//host/…` only works in browsers). Paths are joined as is.
-- **Absolute URLs still get the default token and headers.** For a URL that must not get them, such as a presigned storage URL or a link to another API, pass `ignoreDefaults: true`: the request is then sent without any default (base URL, token, headers, timeout, credentials), as with the plain functions.
-- **Options of a request win over the defaults**: its `token`, `timeout` and `credentials` replace the defaults, and its headers replace the default headers of the same name (ignoring case). A request with its own `Authorization` header doesn't get the default token. `timeout: null` or `Infinity` removes the default timeout, e.g. for a long upload.
+- **Absolute URLs still get the default token and headers.** For a URL that must not get them, such as a presigned storage URL or a link to another API, pass `ignoreDefaults: true`: the request is then sent without any default (base URL, token, headers, timeout, retry, credentials), as with the plain functions.
+- **Options of a request win over the defaults**: its `token`, `timeout`, `retry` and `credentials` replace the defaults, and its headers replace the default headers of the same name (ignoring case). A request with its own `Authorization` header doesn't get the default token. `timeout: null` or `Infinity` removes the default timeout, e.g. for a long upload, and `retry: 0` the default retries.
 
 ### Renewing an expired token
 
