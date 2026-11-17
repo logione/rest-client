@@ -2,17 +2,60 @@
 
 This is a free, ultra-lightweight and easy-to-use http(s) client for Node.js and browsers supporting JSON requests and streams with no external dependencies.
 
-It uses fetch to provide a simple interface for making http(s) requests, and the native Node.js http and https modules for streams.
+It uses fetch for every request, in Node.js and in browsers. In Node.js, the stream functions send and return Node.js streams on top of fetch.
 
-**New: it supports [Standard Schema](https://standardschema.dev) validation. So, you can validate the data received from any API with your preferred library ([list of supported libraries](https://github.com/standard-schema/standard-schema/blob/main/packages/spec/README.md#what-schema-libraries-implement-the-spec)).**
+It is similar to [ky](https://github.com/sindresorhus/ky) or [ofetch](https://github.com/unjs/ofetch), with built-in schema validation, token renewal and Node.js streams.
+
+**It supports [Standard Schema](https://standardschema.dev) validation. So, you can validate the data received from any API with your preferred library ([list of supported libraries](https://github.com/standard-schema/standard-schema/blob/main/packages/spec/README.md#what-schema-libraries-implement-the-spec)).**
+
+### Compared to fetch
+
+The same POST request with a bearer token, which fails on an error status:
+
+```javascript
+// With fetch
+const response = await fetch('https://myapi/addresses', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    Authorization: `Bearer ${token}`
+  },
+  body: JSON.stringify({ name: 'john' })
+})
+if (!response.ok) {
+  throw new Error(`${response.status} ${response.statusText}`)
+}
+const address = await response.json()
+
+// With rest-client
+const address = await postJSON('https://myapi/addresses', { body: { name: 'john' }, token })
+```
+
+`postJSON` also handles what the fetch version doesn't: an empty response, a response that isn't JSON, a `timeout`, `search` parameters, and an optional `schema` to validate the result.
+
+### Two ways to use it
+
+```javascript
+// 1. Functions: each request gives everything it needs
+import { getJSON } from '@logi.one/rest-client'
+
+const user = await getJSON('https://myapi/v1/users/1', { token })
+
+// 2. RestClient: give the base URL, token and headers once
+import { RestClient } from '@logi.one/rest-client'
+
+const api = new RestClient({ baseUrl: 'https://myapi/v1', token })
+const user = await api.getJSON('users/1')
+```
+
+Both have the same methods and options. The functions suit a few requests to different APIs. `RestClient` suits an app that talks to one API: it sends its defaults with every request, can [renew an expired token](#renewing-an-expired-token), and is easy to [mock in tests](#restclient). See [RestClient](#restclient).
 
 ## Installation
 
 ```bash
 npm install @logi.one/rest-client
 ```
-
-With TypeScript in a Node.js project, the type definitions also need the Node.js types (`npm install --save-dev @types/node`), which most Node.js projects already have. Browser projects don't need them.
 
 ## Browser support
 
@@ -70,8 +113,8 @@ In every function, `headers` can be a plain object, a `Headers` instance or an a
 Notes on JSON requests:
 
 - **Body**: objects and other values are serialized with `JSON.stringify`, and `Content-Type: application/json` is added. A string is sent as is (already serialized JSON), so an empty string sends no body. `null`, `false` and `0` are sent as JSON with `postJSON`, `putJSON` and `patchJSON`, and ignored with `getJSON` and `deleteJSON`.
-- **Content type**: `Accept` and `Content-Type` default to `application/json`. A JSON media type you set yourself is kept, such as `Content-Type: application/merge-patch+json` or `Accept: application/vnd.api+json`.
-- **Response**: JSON content types (`application/json` and `+json` types such as `application/problem+json`) are parsed. Other content types are returned as text.
+- **Content type**: `Accept` is set to `application/json`, and so is `Content-Type` when there is a body. A JSON media type you set yourself is kept, such as `Content-Type: application/merge-patch+json` or `Accept: application/vnd.api+json`; any other value is replaced.
+- **Response**: JSON content types (`application/json` and `+json` types such as `application/problem+json`) are parsed, and an empty JSON response gives `undefined`. Other content types are returned as text.
 
 ### JSON request with schema validation
 
@@ -93,6 +136,8 @@ try {
   }
 }
 ```
+
+Every JSON function accepts a `schema`. It validates the parsed response, and the result is typed by the schema. A response that doesn't match it rejects with a `SchemaValidationError`, whose `issues` are those of the schema library.
 
 ### Stream requests (Node.js only)
 
@@ -166,8 +211,10 @@ await get('https://myapi/texts', { search: 'page=1&sort=true&filter=noreply%40fa
 await get('https://myapi/texts', { search: [['page', '1'], ['sort', 'true'], ['filter', 'noreply@fake.ch']]})
 await get('https://myapi/texts', { search: new URLSearchParams({ page: '1', sort: 'true', filter: 'noreply@fake.ch' })})
 await get('https://myapi/texts', { search: { page: 1, sort: true, filter: 'noreply@fake.ch' }})
-await get('https://myapi/texts?page=1&limit=2&filter=noreply%40fake.ch')
+await get('https://myapi/texts?page=1&sort=true&filter=noreply%40fake.ch')
 ```
+
+In an object, `null` and `undefined` values are left out. The parameters are added to those already in the URL, before any `#hash`: `get('https://myapi/texts?page=1', { search: { sort: true } })` requests `https://myapi/texts?page=1&sort=true`.
 
 ### Cancellation and timeouts
 
@@ -200,7 +247,9 @@ import { getJSON } from '@logi.one/rest-client'
 const me = await getJSON('https://api.example.com/me', { credentials: 'include' })
 ```
 
-### Client with defaults
+In Node.js, fetch has no cookie store, so `credentials` has no effect: set a `Cookie` header yourself.
+
+### RestClient
 
 `RestClient` has the same methods as the functions (`getJSON`, `postJSON`, `putJSON`, `patchJSON`, `deleteJSON`, `get`, `head`, `post`, `put`, `patch`, `del`, and in Node.js `getStream`, `postStream`, `putStream`, `patchStream`) and sends its defaults with every request.
 
@@ -258,6 +307,14 @@ const api = new RestClient({
 - **Not called** when the client has no token, for requests with their own `token` or `Authorization` header, with `ignoreDefaults`, or with a stream body (`postStream`, `putStream`, `patchStream`, or `post`, `put`, `patch` with a stream), since a stream can't be sent twice. `getStream` is retried.
 
 ### Error handling
+
+A request rejects with:
+
+- **`RequestError`** when the response status is not 2xx, with `status`, `headers` and the `response`.
+- **`SchemaValidationError`** when the response doesn't match the `schema`.
+- **The abort reason** when the `signal` aborts: an `AbortError` by default, or the reason given to `abort(reason)`. A `TimeoutError` when the `timeout` expires.
+- **A network error** when the server can't be reached: fetch's `TypeError: fetch failed` with the reason in `error.cause`, and for the stream functions that reason itself, such as an error with `code: 'ECONNREFUSED'`.
+- **A `RangeError`** for an invalid `timeout`, before anything is sent.
 
 ```javascript
 import { getJSON, getStream } from '@logi.one/rest-client'
