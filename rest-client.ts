@@ -77,9 +77,9 @@ export class RestClient implements IRestClient {
 
     private readonly headers: Record<string, string>
     /** The renewal in progress, for the token it renews. */
-    private renewal: { token: string | undefined, renewed: Promise<boolean> } | undefined
-    /** A token that onUnauthorized failed to renew, so its later 401s don't call it again. */
-    private unrenewable: { token: string | undefined } | undefined
+    private renewal: { credential: string | undefined, renewed: Promise<boolean> } | undefined
+    /** A credential that onUnauthorized failed to renew, so its later 401s don't call it again. */
+    private unrenewable: { credential: string | undefined } | undefined
 
     constructor(options: RestClientOptions = {}) {
         this.baseUrl = options.baseUrl
@@ -171,7 +171,7 @@ export class RestClient implements IRestClient {
             if (!replayable || !(err instanceof RequestError) || err.status !== 401 || !this.usesClientCredentials(options)) {
                 throw err
             }
-            if (!await this.renew(err, merged.token)) {
+            if (!await this.renew(err, this.credential(merged))) {
                 // The 401 body is kept for the caller.
                 throw err
             }
@@ -180,30 +180,34 @@ export class RestClient implements IRestClient {
         return run(...this.prepare(url, options))
     }
 
-    /** Resolves true when the request sent with `sentToken` should be sent again. */
-    private renew(error: RequestError<unknown>, sentToken: string | undefined): Promise<boolean> {
-        if (this.token !== sentToken) {
+    /**
+     * Resolves true when the request sent with the `sent` credential should be sent again.
+     * Credentials are compared by their Authorization value, so a token and a default Authorization header work alike.
+     */
+    private renew(error: RequestError<unknown>, sent: string | undefined): Promise<boolean> {
+        if (this.credential(this.withDefaults({})) !== sent) {
             // Renewed since the request was sent.
             return Promise.resolve(true)
         }
-        if (this.renewal && this.renewal.token === sentToken) {
+        if (this.renewal && this.renewal.credential === sent) {
             return this.renewal.renewed
         }
-        if (!this.onUnauthorized || (this.unrenewable && this.unrenewable.token === sentToken)) {
+        if (!this.onUnauthorized || (this.unrenewable && this.unrenewable.credential === sent)) {
             return Promise.resolve(false)
         }
         const onUnauthorized = this.onUnauthorized
         const renewal = {
-            token: sentToken,
+            credential: sent,
             renewed: (async () => {
                 const copy = this.copyWithoutOnUnauthorized()
+                const copiedToken = copy.token
                 const copiedHeaders = { ...copy.headers }
                 const result = await onUnauthorized(error, copy)
                 if (result === false) {
-                    this.unrenewable = { token: sentToken }
+                    this.unrenewable = { credential: sent }
                     return false
                 }
-                this.applyChanges(copy, sentToken, copiedHeaders)
+                this.applyChanges(copy, copiedToken, copiedHeaders)
                 if (typeof result === 'string') {
                     this.token = result
                 }
@@ -245,6 +249,11 @@ export class RestClient implements IRestClient {
                 removeHeader(this.headers, name)
             }
         }
+    }
+
+    /** The Authorization value sent with these options: the token wins over the header, as in fetch.ts. */
+    private credential<T>(options: RequestOptions<T>): string | undefined {
+        return options.token ? `Bearer ${options.token}` : getHeader(toHeaderRecord(options.headers), 'Authorization')
     }
 
     /** True when the request is sent with the client token or default Authorization header, not its own. */
