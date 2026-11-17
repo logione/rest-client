@@ -281,3 +281,5 @@ try {
   }
 }
 ```
+
+With the stream functions, an error response left unread keeps its connection busy until the server closes it. If you don't read `error.response`, call `error.response.resume()` to drain it so the connection can be reused.
