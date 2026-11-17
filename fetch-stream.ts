@@ -1,5 +1,6 @@
 import { IncomingHttpHeaders } from 'http'
 import { Readable } from 'stream'
+import { finished } from 'stream/promises'
 import { ReadableStream as WebReadableStream } from 'stream/web'
 
 import { HttpMethod, request } from './fetch.js'
@@ -38,31 +39,26 @@ export async function patchStream(url: string, readableStream: NodeJS.ReadableSt
 }
 
 async function uploadStream(method: HttpMethod, url: string, readableStream: NodeJS.ReadableStream, options?: RequestOptions<undefined>): Promise<StreamResponse> {
-    let sourceError: unknown
-    let stopped = false
-    // Reads the source through a generator to tell its errors apart from the request errors.
-    const body = (async function* () {
-        try {
-            yield* readableStream as AsyncIterable<Uint8Array>
-        } catch (err) {
-            if (!stopped) {
-                sourceError = err
-            }
-            throw err
-        }
-    })()
+    const source = readableStream instanceof Readable ? readableStream : Readable.from(readableStream)
+    let response: Response
     try {
         // A redirect can't be followed: the stream body can't be sent twice. The 3xx is thrown as is.
-        return toStreamResponse(await request(method, url, { ...options, body }, 'manual'))
+        response = await request(method, url, { ...options, body: source }, 'manual')
     } catch (err) {
-        const error = sourceError ?? toStreamError(err)
+        const error = source.errored ?? toStreamError(err)
         // The server refused the request or it failed: stop reading the rest of the source.
-        stopped = true
-        if (typeof (readableStream as Partial<Readable>).destroy === 'function') {
-            (readableStream as Readable).destroy()
-        }
+        source.destroy()
         throw error
     }
+    // A server can answer 2xx before reading the whole body: wait for the source, as the http version did,
+    // so that a source error isn't lost. When fetch stops reading it instead, Node.js destroys it with an
+    // AbortError: that's not a source error.
+    await finished(source).catch(() => {})
+    if (source.errored && (source.errored as Error).name !== 'AbortError') {
+        response.body?.cancel().catch(() => {})
+        throw source.errored
+    }
+    return toStreamResponse(response)
 }
 
 function toStreamResponse(response: Response): StreamResponse {

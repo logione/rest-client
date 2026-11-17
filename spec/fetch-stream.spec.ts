@@ -500,10 +500,17 @@ describe('fetch-stream response specs', () => {
     const ORIGIN = 'http://localhost:5005'
     let server: Server
     let received: string[]
+    let answered: () => void = () => {}
 
     beforeAll(async () => {
         server = createServer((req, res) => {
             received.push(`${req.method} ${req.url}`)
+            if (req.url === '/early') {
+                // Accepts before reading the request body.
+                res.writeHead(200).end('accepted')
+                answered()
+                return
+            }
             if (req.url === '/reject') {
                 // Rejects without reading the request body and keeps the connection open.
                 res.writeHead(413, 'Payload Too Large', { 'Content-Type': 'application/json' }).end('{"error":"too big"}')
@@ -606,6 +613,31 @@ describe('fetch-stream response specs', () => {
         expect(error.status).toBe(413)
         expect(await read(error.response)).toBe('{"error":"too big"}')
         expect(source.destroyed).toBeTrue()
+    })
+
+    describe('when the server answers 2xx before reading the whole upload', () => {
+        it('should reject with a source error that comes after the answer', async () => {
+            const serverAnswered = new Promise<void>((resolve) => answered = resolve)
+            const source = Readable.from((async function* () {
+                yield Buffer.from('first')
+                await serverAnswered
+                // Fails once fetch has the answer, while it still waits for the rest of the source.
+                await new Promise((resolve) => setTimeout(resolve, 50))
+                throw new Error('source failed')
+            })())
+            await expectAsync(putStream(`${ORIGIN}/early`, source)).toBeRejectedWithError('source failed')
+        })
+
+        it('should resolve when the source doesn\'t fail', async () => {
+            const source = Readable.from((function* () {
+                for (let i = 0; i < 100; i++) {
+                    yield Buffer.alloc(64 * 1024)
+                }
+            })())
+            const response = await putStream(`${ORIGIN}/early`, source)
+            expect(response.statusCode).toBe(200)
+            expect(await read(response)).toBe('accepted')
+        })
     })
 
     it('should not crash when the connection of an unread response drops', async () => {
