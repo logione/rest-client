@@ -500,7 +500,6 @@ describe('fetch-stream response specs', () => {
     const ORIGIN = 'http://localhost:5005'
     let server: Server
     let received: string[]
-    let answered: () => void = () => {}
 
     beforeAll(async () => {
         server = createServer((req, res) => {
@@ -508,7 +507,6 @@ describe('fetch-stream response specs', () => {
             if (req.url === '/early') {
                 // Accepts before reading the request body.
                 res.writeHead(200).end('accepted')
-                answered()
                 return
             }
             if (req.url === '/reject') {
@@ -616,16 +614,15 @@ describe('fetch-stream response specs', () => {
     })
 
     describe('when the server answers 2xx before reading the whole upload', () => {
-        it('should reject with a source error that comes after the answer', async () => {
-            const serverAnswered = new Promise<void>((resolve) => answered = resolve)
-            const source = Readable.from((async function* () {
-                yield Buffer.from('first')
-                await serverAnswered
-                // Fails once fetch has the answer, while it still waits for the rest of the source.
-                await new Promise((resolve) => setTimeout(resolve, 50))
-                throw new Error('source failed')
-            })())
-            await expectAsync(putStream(`${ORIGIN}/early`, source)).toBeRejectedWithError('source failed')
+        it('should resolve without waiting for a source that doesn\'t end', async () => {
+            const source = new Readable({ read() {} })
+            source.push('first')
+            const start = Date.now()
+            const response = await putStream(`${ORIGIN}/early`, source)
+            expect(response.statusCode).toBe(200)
+            expect(await read(response)).toBe('accepted')
+            expect(Date.now() - start).toBeLessThan(1000)
+            source.destroy()
         })
 
         it('should resolve when the source doesn\'t fail', async () => {

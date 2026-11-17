@@ -1,6 +1,5 @@
 import { IncomingHttpHeaders } from 'http'
 import { Readable } from 'stream'
-import { finished } from 'stream/promises'
 import { ReadableStream as WebReadableStream } from 'stream/web'
 
 import { HttpMethod, request } from './fetch.js'
@@ -50,14 +49,8 @@ async function uploadStream(method: HttpMethod, url: string, readableStream: Nod
         source.destroy()
         throw error
     }
-    // A server can answer 2xx before reading the whole body: wait for the source, as the http version did,
-    // so that a source error isn't lost. When fetch stops reading it instead, Node.js destroys it with an
-    // AbortError: that's not a source error.
-    await finished(source).catch(() => {})
-    if (source.errored && (source.errored as Error).name !== 'AbortError') {
-        response.body?.cancel().catch(() => {})
-        throw source.errored
-    }
+    // Not waiting for the source: a server can answer 2xx before reading the whole body, and waiting
+    // for a source that doesn't end would never resolve. A source error after the answer is then lost.
     return toStreamResponse(response)
 }
 
