@@ -227,13 +227,13 @@ export class RestClient implements IRestClient {
 
     /**
      * The client token the request was sent with, or undefined when it was sent without it: with
-     * ignoreDefaults, its own token or Authorization header, or no client token.
+     * ignoreDefaults, its own token or Authorization header, or no client token (undefined or '', which sends none).
      */
     private clientTokenSent<T>(options: RestClientRequestOptions<T> | undefined, merged: RequestOptions<T>): string | undefined {
         if (options?.ignoreDefaults || options?.token !== undefined || hasHeader(toHeaderRecord(options?.headers), 'Authorization')) {
             return undefined
         }
-        return merged.token
+        return merged.token || undefined
     }
 
     /** Returns the URL to request and a copy of the request options completed with the client defaults. */

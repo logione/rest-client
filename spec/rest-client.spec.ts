@@ -332,6 +332,15 @@ describe('RestClient specs', () => {
             expect(received.length).toBe(4)
         })
 
+        it('should not be called for a client whose token is empty', async () => {
+            const onUnauthorized = jasmine.createSpy('onUnauthorized').and.returnValue('fresh')
+            const api = new RestClient({ baseUrl: ORIGIN, token: 'old', onUnauthorized })
+            api.token = '' // e.g. after a logout
+            await expectAsync(api.getJSON('private')).toBeRejectedWith(status401)
+            expect(onUnauthorized).not.toHaveBeenCalled()
+            expect(methods()).toEqual(['GET /private undefined'])
+        })
+
         it('should not be called for a client without token, with only a default Authorization header', async () => {
             const onUnauthorized = jasmine.createSpy('onUnauthorized').and.returnValue('fresh')
             const api = new RestClient({ baseUrl: ORIGIN, headers: { Authorization: 'Bearer old' }, onUnauthorized })
